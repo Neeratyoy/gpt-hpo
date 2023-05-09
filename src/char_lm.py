@@ -6,7 +6,7 @@ from attention import Block
 from utils import train_and_evaluate_model, estimate_loss, plot_losses
 
 
-class CharGPT(nn.Module):
+class CharLM(nn.Module):
 
     def __init__(
             self,
@@ -123,7 +123,7 @@ if __name__ == "__main__":
 
     # Initializing model
 
-    model = CharGPT(
+    model = CharLM(
         vocab_size=VOCAB_SIZE,
         n_layers=LAYERS,
         block_size=BLOCK_SIZE,
