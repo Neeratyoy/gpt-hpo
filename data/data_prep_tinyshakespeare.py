@@ -95,6 +95,11 @@ def get_batch(split: str, block_size: int = 8, batch_size: int = 4, device: str 
 
 
 if __name__ == "__main__":
+    """
+    Demonstrates how the dataset can be loaded and verified for use.
+    Provides an example use of the batching function for training and validation.
+    """
+
     # Reading dataset as a list of characters
     vocab, text = extract_vocab_and_data(input_path)
 
