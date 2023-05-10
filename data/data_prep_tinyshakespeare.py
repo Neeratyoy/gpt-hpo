@@ -58,12 +58,23 @@ def create_data_splits(
     return data, train_data, valid_data
 
 
-def get_batch(split: str, block_size: int = 8, batch_size: int = 4, device: str = None):
+def get_batch(
+        split: str,
+        train_data: torch.Tensor,
+        valid_data: torch.Tensor,
+        block_size: int = 8,
+        batch_size: int = 4,
+        device: str = None
+):
     """ Gets a randomized batch from the split of data chosen.
 
     Arguments
     ---------
     split : str, {"train", "valid"}
+    train_data: torch.Tensor
+        The training data
+    valid_data: torch.Tensor
+        The validation data
     block_size : int
         The context length for predictions, that is, a sentence length
     batch_size : int

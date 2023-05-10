@@ -7,15 +7,21 @@ import tqdm
 from typing import List, Tuple, Callable, Dict
 
 
-def plot_losses(losses, verbosity, filepath, val_losses=None):
-    # plt.clf()
+def plot_losses(losses, verbosity, filepath, val_losses=None, lrs=None):
+    plt.clf()
     plt.plot(losses, label="train");
     if val_losses is not None:
         plt.plot(val_losses, label="valid");
-        plt.legend();
     plt.ylabel("Loss")
     plt.xlabel(f"Num steps (~{verbosity}x)")
     plt.xlim(0, len(losses))
+    plt.legend(loc="upper right");
+    if lrs is not None:
+        ax2 = plt.gca().twinx()
+        # plot the second line on the secondary y-axis
+        ax2.plot(lrs, label="lr", color="red");
+        ax2.set_ylabel('Learning rate')
+    ax2.legend(loc="lower left");
     plt.tight_layout()
     plt.savefig(filepath, dpi=300);
 
@@ -103,35 +109,34 @@ print(f"The model has approximately {flops / 1e6:.2f} million FLOPs.")
 
 
 @torch.no_grad()
-def estimate_loss(model: nn.Module, eval_iters: int, get_batch: Callable) -> Dict[str, float]:
+def estimate_loss(
+        model: nn.Module,
+        X: torch.Tensor,
+        Y: torch.Tensor,
+        # eval_iters: int,
+) -> Dict[str, float]:
     """ Function to evaluate the model on train & valid splits.
     """
-    out = {}
-    model.eval()
-    for split in ['train', 'valid']:
-        losses = torch.zeros(eval_iters)
-        for k in range(eval_iters):
-            X, Y = get_batch(split)
-            logits, loss = model(X, Y)
-            losses[k] = loss.item()
-        out[split] = losses.mean()
-    model.train()
-    return out
+    _, loss = model(X, Y)
+    return loss.item()
 
 
 def train_and_evaluate_model(
     model: nn.Module,
+    train_data: torch.Tensor,
+    valid_data: torch.Tensor,
     block_size: int,
     batch_size: int,
     get_batch: Callable,
     optimizer: torch.optim = None,
+    scheduler: torch.optim.lr_scheduler = None,
     num_train_steps: int = 10000,
     verbosity_len: int = 1000,
     eval_iters: int = 500,
     plot_loss: str = True,
     device: str = "cpu",
     **kwargs
-):
+) -> Dict[str, List[float]]:
     model.train()
     if optimizer is None:
         optimizer = torch.optim.AdamW(
@@ -140,11 +145,12 @@ def train_and_evaluate_model(
 
     train_losses = [np.inf]
     valid_losses = [np.inf]
+    lrs = []
 
     for iter in tqdm(range(num_train_steps)):
 
         # sample a batch of data
-        xb, yb = get_batch('train', block_size, batch_size, device)
+        xb, yb = get_batch('train', train_data, valid_data, block_size, batch_size, device)
 
         # evaluate loss on the batch
         logits, loss = model(xb, yb)
@@ -154,19 +160,35 @@ def train_and_evaluate_model(
         loss.backward()
         optimizer.step()
 
+        # scheduler step
+        lrs.append(scheduler.get_last_lr()[0])
+        scheduler.step()
+
+        train_losses.append(loss.item())
+        valid_losses.append(valid_losses[-1])
+
         # every once in a while evaluate the loss on train and val sets
         if iter % verbosity_len == 0 or iter == num_train_steps - 1:
-            _losses = estimate_loss(model, eval_iters)
-            train_losses.append(_losses['train'])
-            valid_losses.append(_losses['valid'])
-            print()
+            model.eval()
+            losses = []
+            for _ in range(eval_iters):
+                X, Y = get_batch('valid', train_data, valid_data, block_size, batch_size, device)
+                losses.append(estimate_loss(model, X, Y))
+            valid_losses[-1] = np.mean(losses)
+            model.train()
+            _train = np.mean(train_losses[-1])
+            _valid = np.mean(valid_losses[-1])
             print(
-                f"step {iter}: train loss {_losses['train']:.4f}, "\
-                f"val loss {_losses['valid']:.4f}"
+                f"step {iter}: train loss={_train:.4f}, val loss={_valid:.4f}"
             )
 
     if plot_loss:
-        plot_losses(train_losses, verbosity_len, valid_losses)
+        plot_losses(train_losses, verbosity_len, "temp.png", valid_losses, lrs)
+    _losses = {
+        "train": train_losses,
+        "valid": valid_losses,
+        "lrs": lrs,
+    }
     return _losses
 
 

@@ -188,6 +188,6 @@ if __name__ == "__main__":
     msa = MultiHeadAttention(**args)
 
     # Sampling a random tensor of the shape of a batch of data
-    print("Sampling a random tensor of the shape of a batch of data..."
+    print("Sampling a random tensor of the shape of a batch of data...")
     x = torch.randn(batch_size, block_size, n_embed)
     print(x.shape)

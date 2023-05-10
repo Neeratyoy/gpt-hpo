@@ -2,9 +2,13 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
-from attention import Block
-from utils import train_and_evaluate_model, estimate_loss, plot_losses
+from src.attention import Block
+from src.lr_schedulers import cosine_scheduler
+from src.utils import train_and_evaluate_model, estimate_loss, plot_losses, count_trainable_params
 
+from data.data_prep_tinyshakespeare import (
+    extract_vocab_and_data, create_text_encoder_decoder, create_data_splits, get_batch
+)
 
 class CharLM(nn.Module):
 
@@ -100,29 +104,36 @@ class CharLM(nn.Module):
 
 
 if __name__ == "__main__":
+    # Preparing data
+    train_size = 0.9
+    input_path = "data/tinyshakespeare/input.txt"
+    vocab, text = extract_vocab_and_data(input_path)
+    vocab_size = len(vocab)
+    encode, decode = create_text_encoder_decoder(vocab)
+    data, train_data, valid_data = create_data_splits(text, train_size, encode, decode)
+
     # Model HPs
-    BLOCK_SIZE = 16
-    EMBED_SIZE = 64
-    NUM_HEADS = 3
+    BLOCK_SIZE = 32
+    EMBED_SIZE = 128
+    NUM_HEADS = 4
     ACTIVATION = "relu"
     PRENORM = False
-    WIDE_FACTOR = 4
+    WIDE_FACTOR = 1
     DROPOUT = 0.0
-    LAYERS = 3
+    LAYERS = 1
 
     # Training HPs
-    BATCH_SIZE = 32
+    BATCH_SIZE = 64
     LEARNING_RATE = 1e-3
 
     # Experiment HPs
     VOCAB_SIZE = vocab_size
     NUM_TRAIN_STEPS = 10000
-    VERBOSTIY_LEN = 1000
-    EVAL_ITERS = 500
+    VERBOSTIY_LEN = 500
+    EVAL_ITERS = 100
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
     # Initializing model
-
     model = CharLM(
         vocab_size=VOCAB_SIZE,
         n_layers=LAYERS,
@@ -137,19 +148,32 @@ if __name__ == "__main__":
     )
     model = model.to(DEVICE)
     # print the number of parameters in the model
-    print(sum(p.numel() for p in model.parameters()) / 1e6, 'M parameters')
+    print(count_trainable_params(model)/1e6, 'M parameters')
+
+    # Initializing optimizer
+    OPTIMIZER = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE)
+    # SCHEDULER = torch.optim.lr_scheduler.CosineAnnealingLR(OPTIMIZER, NUM_TRAIN_STEPS)
+    SCHEDULER = cosine_scheduler(
+        OPTIMIZER, NUM_TRAIN_STEPS * 1.2, eta_min=0, warmup_steps=NUM_TRAIN_STEPS // 10, T_mult=None
+    )
 
     # Training model
-
-    train_and_evaluate_model(
+    print("Number of unique batches: ", (train_data.shape[0] / BLOCK_SIZE) // BATCH_SIZE)
+    losses = train_and_evaluate_model(
         model=model,
+        train_data=train_data,
+        valid_data=valid_data,
         block_size=BLOCK_SIZE,
         batch_size=BATCH_SIZE,
-        optimizer=None,  # internally uses AdamW, pass an optimizer to override
+        get_batch=get_batch,
+        optimizer=OPTIMIZER,  # internally uses AdamW, pass an optimizer to override
+        scheduler=SCHEDULER,
         num_train_steps=NUM_TRAIN_STEPS,
         verbosity_len=VERBOSTIY_LEN,
         eval_iters=EVAL_ITERS,
-        plot_loss=True,
+        plot_loss=False,
         device=DEVICE,
         learning_rate=LEARNING_RATE  # part of kwargs
-    );
+    )
+
+    plot_losses(losses["train"], VERBOSTIY_LEN, "temp.png", losses["valid"], losses["lrs"])
