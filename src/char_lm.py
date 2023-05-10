@@ -120,7 +120,7 @@ if __name__ == "__main__":
     PRENORM = False
     WIDE_FACTOR = 1
     DROPOUT = 0.0
-    LAYERS = 1
+    LAYERS = 3
 
     # Training HPs
     BATCH_SIZE = 64
@@ -130,7 +130,7 @@ if __name__ == "__main__":
     VOCAB_SIZE = vocab_size
     NUM_TRAIN_STEPS = 10000
     VERBOSTIY_LEN = 500
-    EVAL_ITERS = 100
+    EVAL_ITERS = 500
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
     # Initializing model
@@ -154,7 +154,7 @@ if __name__ == "__main__":
     OPTIMIZER = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE)
     # SCHEDULER = torch.optim.lr_scheduler.CosineAnnealingLR(OPTIMIZER, NUM_TRAIN_STEPS)
     SCHEDULER = cosine_scheduler(
-        OPTIMIZER, NUM_TRAIN_STEPS * 1.2, eta_min=0, warmup_steps=NUM_TRAIN_STEPS // 10, T_mult=None
+        OPTIMIZER, NUM_TRAIN_STEPS * 1.05, eta_min=0, warmup_steps=NUM_TRAIN_STEPS // 10, T_mult=None
     )
 
     # Training model
