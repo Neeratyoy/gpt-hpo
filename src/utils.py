@@ -3,7 +3,7 @@ import numpy as np
 import time
 import torch
 import torch.nn as nn
-import tqdm
+from tqdm import tqdm
 from typing import List, Tuple, Callable, Dict
 
 
@@ -21,6 +21,7 @@ def plot_losses(losses, verbosity, filepath, val_losses=None, lrs=None):
         # plot the second line on the secondary y-axis
         ax2.plot(lrs, label="lr", color="red");
         ax2.set_ylabel('Learning rate')
+        # ax2.set_yscale('log')
     ax2.legend(loc="lower left");
     plt.tight_layout()
     plt.savefig(filepath, dpi=300);

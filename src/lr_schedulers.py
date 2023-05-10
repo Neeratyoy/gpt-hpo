@@ -46,21 +46,59 @@ import math
 from torch.optim.lr_scheduler import LambdaLR
 
 
-def cosine_scheduler(optimizer, T_max, eta_min=0, warmup_steps=500, T_mult=None):
+def cosine_scheduler(optimizer, T_max, eta_min=0, warmup_steps=500, T_mult=1, last_epoch=-1):
     """
-    Cosine annealing with warm restarts.
+    Cosine annealing with warm restarts with optional warmup.
     """
-    def lr_lambda(step, warmup_steps, T_max, eta_min, T_mult):
+    def lr_lambda(step, warmup_steps, T_max, eta_min, T_mult, last_epoch):
+        step += last_epoch + 1
         if step < warmup_steps:
             return step / warmup_steps
         else:
             step -= warmup_steps
-            if T_mult is not None:
-                # warm restarts
-                T_max *= T_mult
-            return eta_min + (0.5 * (1 + math.cos(math.pi * (step % T_max) / T_max)))
+            # warm restarts if resulting T_max < step
+            T_max *= T_mult
+            # TODO: check if eta_min is enforced correctly
+            multiplier = eta_min + (0.5 * (1 + math.cos(math.pi * (step % T_max) / T_max)))
+            return multiplier
 
     scheduler = LambdaLR(
-        optimizer, lambda step: lr_lambda(step, warmup_steps, T_max, eta_min, T_mult)
+        optimizer, lambda step: lr_lambda(step, warmup_steps, T_max, eta_min, T_mult, last_epoch)
+    )
+    return scheduler
+
+
+def step_decay_scheduler(optimizer, warmup_steps, step_size, gamma, last_epoch=-1):
+    """
+    Step decay learning rate scheduler with optional warmup.
+    """
+    def lr_lambda(step, warmup_steps, step_size, gamma, last_epoch):
+        step += last_epoch + 1
+        if step < warmup_steps:
+            return step / warmup_steps
+        else:
+            step -= warmup_steps
+            return gamma ** (step // step_size)
+
+    scheduler = LambdaLR(
+        optimizer, lambda step: lr_lambda(step, warmup_steps, step_size, gamma, last_epoch)
+    )
+    return scheduler
+
+
+def exp_decay_scheduler(optimizer, warmup_steps, gamma, last_epoch=-1):
+    """
+    Exponential decay learning rate scheduler with optional warmup.
+    """
+    def lr_lambda(step, warmup_steps, gamma, last_epoch):
+        step += last_epoch + 1
+        if step < warmup_steps:
+            return step / warmup_steps
+        else:
+            step -= warmup_steps
+            return  gamma ** step
+
+    scheduler = LambdaLR(
+        optimizer, lambda step: lr_lambda(step, warmup_steps, gamma, last_epoch)
     )
     return scheduler

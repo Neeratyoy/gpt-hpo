@@ -3,7 +3,7 @@ import torch.nn as nn
 from torch.nn import functional as F
 
 from src.attention import Block
-from src.lr_schedulers import cosine_scheduler
+from src.lr_schedulers import cosine_scheduler, step_decay_scheduler, exp_decay_scheduler
 from src.utils import train_and_evaluate_model, estimate_loss, plot_losses, count_trainable_params
 
 from data.data_prep_tinyshakespeare import (
@@ -120,7 +120,7 @@ if __name__ == "__main__":
     PRENORM = False
     WIDE_FACTOR = 1
     DROPOUT = 0.0
-    LAYERS = 3
+    LAYERS = 1
 
     # Training HPs
     BATCH_SIZE = 64
@@ -128,9 +128,9 @@ if __name__ == "__main__":
 
     # Experiment HPs
     VOCAB_SIZE = vocab_size
-    NUM_TRAIN_STEPS = 10000
-    VERBOSTIY_LEN = 500
-    EVAL_ITERS = 500
+    NUM_TRAIN_STEPS = 1000
+    VERBOSTIY_LEN = 50
+    EVAL_ITERS = 50
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
     # Initializing model
@@ -152,10 +152,16 @@ if __name__ == "__main__":
 
     # Initializing optimizer
     OPTIMIZER = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE)
-    # SCHEDULER = torch.optim.lr_scheduler.CosineAnnealingLR(OPTIMIZER, NUM_TRAIN_STEPS)
+    # SCHEDULER = torch.optim.lr_scheduler.CosineAnnealingLR(OPTIMIZER, NUM_TRAIN_STEPS, 0.0002)
     SCHEDULER = cosine_scheduler(
-        OPTIMIZER, NUM_TRAIN_STEPS * 1.05, eta_min=0, warmup_steps=NUM_TRAIN_STEPS // 10, T_mult=None
+        OPTIMIZER, NUM_TRAIN_STEPS, eta_min=0.0002, warmup_steps=NUM_TRAIN_STEPS // 10
     )
+    # SCHEDULER = step_decay_scheduler(
+    #     OPTIMIZER, warmup_steps=0, step_size=NUM_TRAIN_STEPS // 10, gamma=0.5
+    # )
+    # SCHEDULER = exp_decay_scheduler(
+    #     OPTIMIZER, warmup_steps=NUM_TRAIN_STEPS // 10, gamma=0.9
+    # )
 
     # Training model
     print("Number of unique batches: ", (train_data.shape[0] / BLOCK_SIZE) // BATCH_SIZE)
