@@ -11,7 +11,6 @@ Check with:
 
 import math
 import numpy as np
-import matplotlib.pyplot as plt
 import pickle
 from tqdm import tqdm
 from typing import List, Tuple, Callable, Dict
@@ -21,7 +20,7 @@ import torch.nn as nn
 from torch.nn import functional as F
 
 
-input_path = "tinyshakespeare/input.txt"
+input_path = "data/tinyshakespeare/input.txt"
 
 
 def extract_vocab_and_data(filepath: str) -> List[str]:
@@ -159,7 +158,7 @@ if __name__ == "__main__":
 
     # Example sample
     print("Example sample...")
-    x, y = get_batch("train")
+    x, y = get_batch("train", train_data, valid_data, BLOCK_SIZE, BATCH_SIZE, device="cpu")
     print(x.shape, y.shape)
     print("Shape of x and y:", x.shape, y.shape)
 
