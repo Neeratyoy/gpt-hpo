@@ -156,6 +156,9 @@ if __name__ == "__main__":
     print(f"Training data: {train_data.shape}")
     print(f"Validation data: {valid_data.shape}")
 
+    BLOCK_SIZE = 8
+    BATCH_SIZE = 4
+
     # Example sample
     print("Example sample...")
     x, y = get_batch("train", train_data, valid_data, BLOCK_SIZE, BATCH_SIZE, device="cpu")
@@ -164,8 +167,6 @@ if __name__ == "__main__":
 
     # Demonstrating how the future elements are not part of the input context
     print("Demonstrating how the future elements are not part of the input context...")
-    BLOCK_SIZE = 8
-    BATCH_SIZE = 4
 
     print(f"Examples from batch: \n{'-' * 20}")
     for b in range(2):  # batch
