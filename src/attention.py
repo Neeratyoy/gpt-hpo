@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
+from utils import get_acquisition_function
+
 
 class Head(nn.Module):
     """ one head of self-attention """
@@ -95,7 +97,7 @@ class FeedForward(nn.Module):
             dropout: float = 0.0
         ):
         super().__init__()
-        self.activation = nn.ReLU if activation == "relu" else nn.GELU
+        self.activation = get_acquisition_function(activation)
         self.dropout = dropout
         self.net = nn.Sequential(
             nn.Linear(n_embed, wide_factor * n_embed),

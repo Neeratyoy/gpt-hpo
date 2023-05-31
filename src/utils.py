@@ -7,6 +7,27 @@ from tqdm import tqdm
 from typing import List, Tuple, Callable, Dict
 
 
+
+class Swish(nn.Module):
+    # https://arxiv.org/abs/1710.05941v2
+    def forward(self, x):
+        return x * torch.sigmoid(x)
+
+
+def get_acquisition_function(name: str):
+    acquisition_map = dict(
+        relu=nn.ReLU,
+        gelu=nn.GELU,
+        sigmoid=nn.Sigmoid,
+        tanh=nn.Tanh,
+        softplus=nn.Softplus,
+        swish=Swish,
+        silu=nn.SiLU,
+    )
+    assert name in acquisition_map.keys(), f"{name} not in {list(acquisition_map.keys())}"
+    return acquisition_map[name]
+
+
 def plot_losses(losses, verbosity, filepath, val_losses=None, lrs=None):
     plt.clf()
     plt.plot(losses, label="train");
