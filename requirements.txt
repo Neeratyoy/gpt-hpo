@@ -2,3 +2,4 @@ torch
 datasets
 tiktoken
 tqdm
+ConfigSpace

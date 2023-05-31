@@ -1,4 +1,6 @@
 """
+Summarized from Bing AI
+
 Here is a more comprehensive list of learning rate schedulers available in PyTorch's `torch.optim.lr_scheduler` package:
 
 - `LambdaLR`: Sets the learning rate of each parameter group to the initial lr times a given function.
@@ -52,6 +54,7 @@ def cosine_scheduler(optimizer, T_max, eta_min=0, warmup_steps=500, T_mult=1, la
     """
     def lr_lambda(step, warmup_steps, T_max, eta_min, T_mult, last_epoch):
         step += last_epoch + 1
+        T_max -= warmup_steps
         if step < warmup_steps:
             return step / warmup_steps
         else:

@@ -57,56 +57,55 @@ def count_flops(model, input_shape):
 
 
 # TODO: verify this ChatGPT solution
-def measure_throughput(model, input_data, batch_size=1, num_runs=10):
-    """Measure the throughput (in samples per second) of a PyTorch model on input data."""
-    # Set the model to evaluation mode
-    model.eval()
+# def measure_throughput(model, input_data, batch_size=1, num_runs=10):
+#     """Measure the throughput (in samples per second) of a PyTorch model on input data."""
+#     # Set the model to evaluation mode
+#     model.eval()
 
-    # Create a dataloader for the input data
-    input_loader = torch.utils.data.DataLoader(input_data, batch_size=batch_size)
+#     # Create a dataloader for the input data
+#     input_loader = torch.utils.data.DataLoader(input_data, batch_size=batch_size)
 
-    # Warm up the GPU by running the model once on a small batch
-    with torch.no_grad():
-        input = next(iter(input_loader))
-        model(input.cuda())
+#     # Warm up the GPU by running the model once on a small batch
+#     with torch.no_grad():
+#         input = next(iter(input_loader))
+#         model(input.cuda())
 
-    # Measure the time required to run the model on the input data
-    start_time = time.time()
-    for i in range(num_runs):
-        for input in input_loader:
-            input = input.cuda()
-            with torch.no_grad():
-                model(input)
-    end_time = time.time()
-    elapsed_time = end_time - start_time
+#     # Measure the time required to run the model on the input data
+#     start_time = time.time()
+#     for i in range(num_runs):
+#         for input in input_loader:
+#             input = input.cuda()
+#             with torch.no_grad():
+#                 model(input)
+#     end_time = time.time()
+#     elapsed_time = end_time - start_time
 
-    # Calculate the throughput in samples per second
-    num_samples = len(input_data)
-    throughput = num_samples * num_runs / elapsed_time
+#     # Calculate the throughput in samples per second
+#     num_samples = len(input_data)
+#     throughput = num_samples * num_runs / elapsed_time
 
-    return throughput
+#     return throughput
 
 
 # TODO: verify this Bing solution
-"""
-import torch
-import torch.nn as nn
-from torchprofile import profile_macs
+# import torch
+# import torch.nn as nn
+# from torchprofile import profile_macs
 
-model = nn.Sequential(
-    nn.Conv2d(3, 32, kernel_size=3, stride=1, padding=1),
-    nn.ReLU(),
-    nn.MaxPool2d(kernel_size=2, stride=2),
-    nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
-    nn.ReLU(),
-    nn.MaxPool2d(kernel_size=2, stride=2),
-    nn.Flatten(),
-    nn.Linear(64 * 8 * 8, 10)
-)
+# model = nn.Sequential(
+#     nn.Conv2d(3, 32, kernel_size=3, stride=1, padding=1),
+#     nn.ReLU(),
+#     nn.MaxPool2d(kernel_size=2, stride=2),
+#     nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
+#     nn.ReLU(),
+#     nn.MaxPool2d(kernel_size=2, stride=2),
+#     nn.Flatten(),
+#     nn.Linear(64 * 8 * 8, 10)
+# )
 
-flops = profile_macs(model, (1, 3, 32, 32))
-print(f"The model has approximately {flops / 1e6:.2f} million FLOPs.")
-"""
+# flops = profile_macs(model, (1, 3, 32, 32))
+# print(f"The model has approximately {flops / 1e6:.2f} million FLOPs.")
+
 
 
 @torch.no_grad()
@@ -217,8 +216,16 @@ def generate_from_model(
     return out
 
 
-def decode_and_print_batch(batch):
+def decode_and_print_batch(batch: torch.Tensor) -> None:
     for b in range(batch.shape[0]):
         print(f"\nBatch ID: {b}")
         print(decode(batch[b].tolist()))
     print()
+    return 1
+
+
+def get_lr(optimizer):
+    lrs = []
+    for param_group in optimizer.param_groups:
+        lrs.append(param_group['lr'])
+    return lrs

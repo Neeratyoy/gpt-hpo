@@ -10,6 +10,7 @@ from data.data_prep_tinyshakespeare import (
     extract_vocab_and_data, create_text_encoder_decoder, create_data_splits, get_batch
 )
 
+
 class CharLM(nn.Module):
 
     def __init__(
@@ -124,13 +125,14 @@ if __name__ == "__main__":
 
     # Training HPs
     BATCH_SIZE = 64
-    LEARNING_RATE = 1e-3
+    LEARNING_RATE = 1
+    MIN_LEARNING_RATE = 0.1
 
     # Experiment HPs
     VOCAB_SIZE = vocab_size
-    NUM_TRAIN_STEPS = 1000
-    VERBOSTIY_LEN = 50
-    EVAL_ITERS = 50
+    NUM_TRAIN_STEPS = 100
+    VERBOSTIY_LEN = 5
+    EVAL_ITERS = 5
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
     # Initializing model
@@ -152,12 +154,14 @@ if __name__ == "__main__":
 
     # Initializing optimizer
     OPTIMIZER = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE)
-    # SCHEDULER = torch.optim.lr_scheduler.CosineAnnealingLR(OPTIMIZER, NUM_TRAIN_STEPS, 0.0002)
+    # SCHEDULER = torch.optim.lr_scheduler.CosineAnnealingLR(
+    #     OPTIMIZER, NUM_TRAIN_STEPS, eta_min=MIN_LEARNING_RATE
+    # )
     SCHEDULER = cosine_scheduler(
-        OPTIMIZER, NUM_TRAIN_STEPS, eta_min=0.0002, warmup_steps=NUM_TRAIN_STEPS // 10
+       OPTIMIZER, NUM_TRAIN_STEPS, eta_min=MIN_LEARNING_RATE, warmup_steps=NUM_TRAIN_STEPS // 10
     )
     # SCHEDULER = step_decay_scheduler(
-    #     OPTIMIZER, warmup_steps=0, step_size=NUM_TRAIN_STEPS // 10, gamma=0.5
+    #     OPTIMIZER, warmup_steps=NUM_TRAIN_STEPS // 10, step_size=NUM_TRAIN_STEPS // 10, gamma=0.5
     # )
     # SCHEDULER = exp_decay_scheduler(
     #     OPTIMIZER, warmup_steps=NUM_TRAIN_STEPS // 10, gamma=0.9

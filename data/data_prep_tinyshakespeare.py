@@ -13,7 +13,7 @@ import math
 import numpy as np
 import pickle
 from tqdm import tqdm
-from typing import List, Tuple, Callable, Dict
+from typing import Callable, Dict, List, Tuple
 
 import torch
 import torch.nn as nn
@@ -105,10 +105,8 @@ def get_batch(
 
 
 if __name__ == "__main__":
-    """
-    Demonstrates how the dataset can be loaded and verified for use.
-    Provides an example use of the batching function for training and validation.
-    """
+    # Demonstrates how the dataset can be loaded and verified for use.
+    # Provides an example use of the batching function for training and validation.
 
     # Reading dataset as a list of characters
     vocab, text = extract_vocab_and_data(input_path)
