@@ -3,9 +3,9 @@ import numpy as np
 import time
 import torch
 import torch.nn as nn
+from torch.optim import SGD, Adam, Adafactor
 from tqdm import tqdm
 from typing import List, Tuple, Callable, Dict
-
 
 
 class Swish(nn.Module):
@@ -26,6 +26,17 @@ def get_acquisition_function(name: str):
     )
     assert name in acquisition_map.keys(), f"{name} not in {list(acquisition_map.keys())}"
     return acquisition_map[name]
+
+
+def get_optimizer(optimizer_name, model_params, lr):
+    if optimizer_name == 'sgd':
+        return SGD(model_params, lr=lr)
+    elif optimizer_name == 'adam':
+        return Adam(model_params, lr=lr)
+    elif optimizer_name == 'adafactor':
+        return Adafactor(model_params)
+    else:
+        raise ValueError(f'{optimizer_name} not in {{sgd, adam, adafactor}}')
 
 
 def plot_losses(losses, verbosity, filepath, val_losses=None, lrs=None):

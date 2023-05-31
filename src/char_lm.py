@@ -125,8 +125,8 @@ if __name__ == "__main__":
 
     # Training HPs
     BATCH_SIZE = 64
-    LEARNING_RATE = 1
-    MIN_LEARNING_RATE = 0.1
+    LEARNING_RATE = 1e-3
+    MIN_LEARNING_RATE = 1e-6
 
     # Experiment HPs
     VOCAB_SIZE = vocab_size
@@ -153,7 +153,8 @@ if __name__ == "__main__":
     print(count_trainable_params(model)/1e6, 'M parameters')
 
     # Initializing optimizer
-    OPTIMIZER = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE)
+    # OPTIMIZER = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE)
+    OPTIMIZER = get_optimizer("sgd", model.parameters(), LEARNING_RATE)
     # SCHEDULER = torch.optim.lr_scheduler.CosineAnnealingLR(
     #     OPTIMIZER, NUM_TRAIN_STEPS, eta_min=MIN_LEARNING_RATE
     # )
