@@ -36,12 +36,15 @@ class CharLM(nn.Module):
             **kwargs
     ):
         super().__init__()
+        self.device = device
+        if self.device is None:
+            self.device = "gpu" if torch.cuda.is_available() else "cpu"
         # each token directly reads off the logits for the next
         # token from a lookup table
         # Note attention does not have any notion of colocation
         # of characters/words and this is important for lms
-        self.token_embedding_table = nn.Embedding(vocab_size, embed_size)
-        self.position_embedding_table = nn.Embedding(block_size, embed_size)
+        self.token_embedding_table = nn.Embedding(vocab_size, embed_size)  # , device=self.device)
+        self.position_embedding_table = nn.Embedding(block_size, embed_size)  # , device=self.device)
         self.blocks = nn.Sequential(
             *[Block(
                 block_size=block_size,
@@ -53,12 +56,9 @@ class CharLM(nn.Module):
                 prenormalize=prenormalize,
             ) for _ in range(n_layers)]  # stacks the layers of Transformer blocks
         )
-        self.ln_f = nn.LayerNorm(embed_size)  # final layer norm (has bias)
-        self.lm_head = nn.Linear(embed_size, vocab_size)
+        self.ln_f = nn.LayerNorm(embed_size)  #, device=self.device)  # final layer norm (has bias)
+        self.lm_head = nn.Linear(embed_size, vocab_size)  #, device=self.device)
 
-        self.device = device
-        if self.device is None:
-            self.device = "gpu" if torch.cuda.is_available() else "cpu"
 
     def forward(self, idx, targets=None):
         # B: batch_size, T: block_size, C: embedding_size
@@ -119,6 +119,10 @@ def setup_model(vocab_size, fixed_config: dict=None, checkpoint=None) -> tuple([
         default_setting.update(fixed_config)
 
     model = CharLM(vocab_size=vocab_size, **default_setting)
+    if "device" not in default_setting:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        default_setting["device"] = device
+    model = model.to(default_setting["device"])
     return model, default_setting
 
 
@@ -181,18 +185,13 @@ if __name__ == "__main__":
     model, setting = setup_model(
         vocab_size=VOCAB_SIZE, fixed_config=fixed_config, checkpoint=None
     )
+    # Print the number of parameters in the model
+    print(count_trainable_params(model)/1e6, 'M parameters')
 
     # Training setup
     optimizer, scheduler = setup_training(model, setting)
 
-    # Print the number of parameters in the model
-    print(count_trainable_params(model)/1e6, 'M parameters')
-
     # Training model
-    print(
-        "Number of unique batches: "\
-        f"{(train_data.shape[0] / setting['block_size']) // setting['batch_size']}"
-    )
     losses = train_and_evaluate_model(
         model=model,
         train_data=train_data,
