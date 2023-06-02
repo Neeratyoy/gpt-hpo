@@ -4,10 +4,10 @@ from ConfigSpace import Categorical, ConfigurationSpace, Constant, Float, Intege
 def charLM_space_CS(seed: int=1234) -> ConfigurationSpace: 
     # HPs that instantiate a model architecture primarily
     model_hps = {
-        "block_size": Integer("block_size", bounds=(32, 512), default=64),
-        "embed_size": Integer("embed_size", bounds=(32, 1024), default=128),
-        "num_heads": Integer("num_heads", bounds=(1, 16), default=4),      
-        "n_layers": Integer("n_layers", bounds=(1, 50), default=3),                            
+        "block_size": Integer("block_size", bounds=(32, 512), default=256, log=True),
+        "embed_size": Integer("embed_size", bounds=(32, 512), default=384, log=True),
+        "num_heads": Integer("num_heads", bounds=(1, 16), default=6),      
+        "n_layers": Integer("n_layers", bounds=(1, 16), default=6),                            
         "wide_factor": Integer("wide_factor", bounds=(1, 5), default=2),                   
         "activation": Categorical(
             "activation", 
@@ -28,12 +28,12 @@ def charLM_space_CS(seed: int=1234) -> ConfigurationSpace:
         # TODO: enforce min LR to be 0 if greater than LR
         "min_learning_rate": Float("min_learning_rate", bounds=(1e-20, 1e-2), log=True, default=1e-6),
         "optimizer_name": Categorical(
-            "optimizer", ["sgd", "adam", "adafactor"], default="adam"
+            "optimizer_name", ["sgd", "adam", "adafactor"], default="adam"
         ),
         "lr_schedule": Categorical(
             "lr_schedule", ["step", "cosine", "constant"], default="cosine"
         ),
-        "warmup_factor": Float("warmup_factor", bounds=(0, 0.5), default=0.1),
+        "warmup_factor": Float("warmup_factor", bounds=(0, 0.25), default=0.1),
     }
 
     cs = ConfigurationSpace(seed=seed, space={**model_hps, **training_hps})

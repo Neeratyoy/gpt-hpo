@@ -107,11 +107,8 @@ def estimate_loss(
 
 def train_and_evaluate_model(
     model: nn.Module,
-    train_data: torch.Tensor,
-    valid_data: torch.Tensor,
-    block_size: int,
     batch_size: int,
-    get_batch: Callable,
+    dataloader: Callable,
     optimizer: torch.optim = None,
     scheduler: torch.optim.lr_scheduler = None,
     max_steps: int = 10000,
@@ -137,14 +134,8 @@ def train_and_evaluate_model(
     for iter in tqdm(range(max_steps)):
 
         # sample a batch of data
-        xb, yb = get_batch(
-            'train', 
-            train_data, 
-            valid_data, 
-            block_size, 
-            batch_size, 
-            device
-        )
+        split = "train"
+        xb, yb = dataloader(split, batch_size)
 
         # evaluate loss on the batch
         logits, loss = model(xb, yb)
@@ -162,13 +153,12 @@ def train_and_evaluate_model(
         valid_losses.append(valid_losses[-1])
 
         # every once in a while evaluate the loss on train and val sets
-        if iter % verbosity_len == 0 or iter == max_steps - 1:
+        if (iter + 1) % verbosity_len == 0 or iter == max_steps - 1:
             model.eval()
             losses = []
             for _ in range(eval_iters):
-                X, Y = get_batch(
-                    'valid', train_data, valid_data, block_size, batch_size, device
-                )
+                split = "valid"
+                X, Y = dataloader(split, batch_size)
                 losses.append(estimate_loss(model, X, Y))
             valid_losses[-1] = np.mean(losses)
             model.train()

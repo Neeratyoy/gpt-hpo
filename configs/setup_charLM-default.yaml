@@ -1,0 +1,12 @@
+max_steps: 5000
+eval_iters: 500
+verbosity_len: 50
+device: null
+
+# settings from https://github.com/karpathy/ng-video-lecture/blob/master/gpt.py
+block_size: 256
+batch_size: 64
+optimizer_name: adam
+lr_schedule: cosine
+prenorm: true
+wide_factor: 2

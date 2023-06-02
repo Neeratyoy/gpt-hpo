@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
+from typing import Union
+import wandb
 
 from src.attention import Block
 from src.lr_schedulers import get_lr_scheduler
@@ -12,8 +14,6 @@ from src.utils import (
     load_config,
     get_optimizer
 )
-
-import wandb
 
 
 wandb.init(project='char-lm')
@@ -113,35 +113,47 @@ class CharLM(nn.Module):
         return idx
 
 
-def setup_model(vocab_size, fixed_config: dict=None, checkpoint=None) -> tuple([nn.Module, dict]):
-    default_setting = load_config("charLM-default")
+def setup_model(
+    config: Union[str, dict]=None, fixed_config: dict=None, checkpoint=None, **kwargs
+) -> tuple([nn.Module, dict]):
+    if config is None or isinstance(config, str):
+        default_setting = load_config(config_name)
+    elif isinstance(config, dict):
+        default_setting = config.copy()
+    else:
+        raise ValueError("config needs to be a str or a dict!") 
+
+    # important step such that the fixed setting always overrides any duplicate HPs
     if fixed_config is not None:
         default_setting.update(fixed_config)
+    assert "vocab_size" in default_setting
 
-    model = CharLM(vocab_size=vocab_size, **default_setting)
-    if "device" not in default_setting:
+    model = CharLM(**default_setting)
+    if "device" not in default_setting or default_setting["device"] is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
         default_setting["device"] = device
     model = model.to(default_setting["device"])
     return model, default_setting
 
 
-def setup_training(model: nn.Module, setting: dict, checkpoint=None):
+def setup_training(
+    model: nn.Module, checkpoint=None, **kwargs
+):
     # initialize the optimizer
     optimizer = get_optimizer(
-        setting["optimizer_name"], model.parameters(), setting["learning_rate"]
+        kwargs["optimizer_name"], model.parameters(), kwargs["learning_rate"]
     )
     # setup the LR scheduler
     #TODO: account for different scheduler settings, right now, only Cosine Annealing
     scheduler_args = dict(
-        scheduler_name=setting["lr_schedule"],
-        min_lr=setting["min_learning_rate"],
-        max_steps=setting["max_steps"],
-        warmup_factor=setting["warmup_factor"],
-        step_size=setting["step_size"],
-        gamma=setting["gamma"],
+        scheduler_name=None if "lr_schedule" not in kwargs else kwargs["lr_schedule"],
+        min_lr=None if "min_learning_rate" not in kwargs else kwargs["min_learning_rate"],
+        max_steps=None if "max_steps" not in kwargs else kwargs["max_steps"],
+        warmup_factor=None if "warmup_factor" not in kwargs else kwargs["warmup_factor"],
+        step_size=None if "step_size" not in kwargs else kwargs["step_size"],
+        gamma=None if "gamma" not in kwargs else kwargs["gamma"],
         last_epoch=-1,  # TODO: load from checkpoint 
-        T_mult=setting["T_mult"]
+        T_mult=None if "T_mult" not in kwargs else kwargs["T_mult"]
     )
     scheduler = get_lr_scheduler(
         optimizer,
