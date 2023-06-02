@@ -27,16 +27,16 @@ def charLM_space_CS(seed: int=1234) -> ConfigurationSpace:
         "learning_rate": Float("learning_rate", bounds=(1e-6, 1), log=True, default=1e-3),
         # TODO: enforce min LR to be 0 if greater than LR
         "min_learning_rate": Float("min_learning_rate", bounds=(1e-20, 1e-2), log=True, default=1e-6),
-        "optimizer": Categorical(
+        "optimizer_name": Categorical(
             "optimizer", ["sgd", "adam", "adafactor"], default="adam"
         ),
         "lr_schedule": Categorical(
             "lr_schedule", ["step", "cosine", "constant"], default="cosine"
         ),
-        "warmup_factor": Float("warmup_steps", bounds=(0, 0.5), default=0.1),
+        "warmup_factor": Float("warmup_factor", bounds=(0, 0.5), default=0.1),
     }
 
-    cs = ConfigurationSpace(seed=seed, space={**model_hps, **training_hps, **exp_hps})
+    cs = ConfigurationSpace(seed=seed, space={**model_hps, **training_hps})
     return cs
 
 

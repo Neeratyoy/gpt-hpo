@@ -3,11 +3,14 @@ import torch.nn as nn
 from torch.nn import functional as F
 
 from src.attention import Block
-from src.lr_schedulers import cosine_scheduler, step_decay_scheduler, exp_decay_scheduler
-from src.utils import train_and_evaluate_model, estimate_loss, plot_losses, count_trainable_params
-
-from data.data_prep_tinyshakespeare import (
-    extract_vocab_and_data, create_text_encoder_decoder, create_data_splits, get_batch
+from src.lr_schedulers import get_lr_scheduler
+from src.utils import (
+    train_and_evaluate_model, 
+    estimate_loss, 
+    plot_losses, 
+    count_trainable_params, 
+    load_config,
+    get_optimizer
 )
 
 
@@ -18,25 +21,26 @@ class CharLM(nn.Module):
             vocab_size: int,
             n_layers: int,
             block_size: int,
-            n_embed: int,
+            embed_size: int,
             num_heads: int,
             wide_factor: int = 4,
             activation: str = "relu",  # could also be "gelu"
             dropout: float = 0.0,
             prenormalize: bool = False,
-            device: str = None
+            device: str = None,
+            **kwargs
     ):
         super().__init__()
         # each token directly reads off the logits for the next
         # token from a lookup table
         # Note attention does not have any notion of colocation
         # of characters/words and this is important for lms
-        self.token_embedding_table = nn.Embedding(vocab_size, n_embed)
-        self.position_embedding_table = nn.Embedding(block_size, n_embed)
+        self.token_embedding_table = nn.Embedding(vocab_size, embed_size)
+        self.position_embedding_table = nn.Embedding(block_size, embed_size)
         self.blocks = nn.Sequential(
             *[Block(
                 block_size=block_size,
-                n_embed=n_embed,
+                embed_size=embed_size,
                 num_heads=num_heads,
                 wide_factor=wide_factor,
                 activation=activation,
@@ -44,8 +48,8 @@ class CharLM(nn.Module):
                 prenormalize=prenormalize,
             ) for _ in range(n_layers)]  # stacks the layers of Transformer blocks
         )
-        self.ln_f = nn.LayerNorm(n_embed)  # final layer norm (has bias)
-        self.lm_head = nn.Linear(n_embed, vocab_size)
+        self.ln_f = nn.LayerNorm(embed_size)  # final layer norm (has bias)
+        self.lm_head = nn.Linear(embed_size, vocab_size)
 
         self.device = device
         if self.device is None:
@@ -104,8 +108,45 @@ class CharLM(nn.Module):
         return idx
 
 
+def setup_model(vocab_size, fixed_config: dict=None, checkpoint=None) -> tuple([nn.Module, dict]):
+    default_setting = load_config("charLM-default")
+    if fixed_config is not None:
+        default_setting.update(fixed_config)
+
+    model = CharLM(vocab_size=vocab_size, **default_setting)
+    return model, default_setting
+
+
+def setup_training(model: nn.Module, setting: dict, checkpoint=None):
+    # initialize the optimizer
+    optimizer = get_optimizer(
+        setting["optimizer_name"], model.parameters(), setting["learning_rate"]
+    )
+    # setup the LR scheduler
+    #TODO: account for different scheduler settings, right now, only Cosine Annealing
+    scheduler_args = dict(
+        scheduler_name=setting["lr_schedule"],
+        min_lr=setting["min_learning_rate"],
+        max_steps=setting["max_steps"],
+        warmup_factor=setting["warmup_factor"],
+        step_size=setting["step_size"],
+        gamma=setting["gamma"],
+        last_epoch=-1,  # TODO: load from checkpoint 
+        T_mult=setting["T_mult"]
+    )
+    scheduler = get_lr_scheduler(
+        optimizer,
+        **scheduler_args
+    )
+    return optimizer, scheduler
+
+
 if __name__ == "__main__":
     # Preparing data
+    from data.data_prep_tinyshakespeare import (
+        extract_vocab_and_data, create_text_encoder_decoder, create_data_splits, get_batch
+    )
+
     train_size = 0.9
     input_path = "data/tinyshakespeare/input.txt"
     vocab, text = extract_vocab_and_data(input_path)
@@ -113,78 +154,48 @@ if __name__ == "__main__":
     encode, decode = create_text_encoder_decoder(vocab)
     data, train_data, valid_data = create_data_splits(text, train_size, encode, decode)
 
-    # Model HPs
-    BLOCK_SIZE = 32
-    EMBED_SIZE = 128
-    NUM_HEADS = 4
-    ACTIVATION = "relu"
-    PRENORM = False
-    WIDE_FACTOR = 1
-    DROPOUT = 0.0
-    LAYERS = 1
-
-    # Training HPs
-    BATCH_SIZE = 64
-    LEARNING_RATE = 1e-3
-    MIN_LEARNING_RATE = 1e-6
-
     # Experiment HPs
     VOCAB_SIZE = vocab_size
-    NUM_TRAIN_STEPS = 100
+    NUM_TRAIN_STEPS = 10
     VERBOSTIY_LEN = 5
     EVAL_ITERS = 5
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-
-    # Initializing model
-    model = CharLM(
-        vocab_size=VOCAB_SIZE,
-        n_layers=LAYERS,
-        block_size=BLOCK_SIZE,
-        n_embed=EMBED_SIZE,
-        num_heads=NUM_HEADS,
-        wide_factor=WIDE_FACTOR,
-        activation=ACTIVATION,
-        dropout=DROPOUT,
-        prenormalize=PRENORM,
-        device=DEVICE,
+    
+    fixed_config = dict(
+        max_steps = NUM_TRAIN_STEPS,
+        verbosity_len = VERBOSTIY_LEN,
+        eval_iters = EVAL_ITERS,
+        device = DEVICE,
+        # scheduler defaults
+        T_mult = 1,
+        gamma = None,
+        step_size = None
     )
-    model = model.to(DEVICE)
-    # print the number of parameters in the model
+
+    # Load defaults
+    model, setting = setup_model(
+        vocab_size=VOCAB_SIZE, fixed_config=fixed_config, checkpoint=None
+    )
+
+    # Training setup
+    optimizer, scheduler = setup_training(model, setting)
+
+    # Print the number of parameters in the model
     print(count_trainable_params(model)/1e6, 'M parameters')
 
-    # Initializing optimizer
-    # OPTIMIZER = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE)
-    OPTIMIZER = get_optimizer("sgd", model.parameters(), LEARNING_RATE)
-    # SCHEDULER = torch.optim.lr_scheduler.CosineAnnealingLR(
-    #     OPTIMIZER, NUM_TRAIN_STEPS, eta_min=MIN_LEARNING_RATE
-    # )
-    SCHEDULER = cosine_scheduler(
-       OPTIMIZER, NUM_TRAIN_STEPS, eta_min=MIN_LEARNING_RATE, warmup_steps=NUM_TRAIN_STEPS // 10
-    )
-    # SCHEDULER = step_decay_scheduler(
-    #     OPTIMIZER, warmup_steps=NUM_TRAIN_STEPS // 10, step_size=NUM_TRAIN_STEPS // 10, gamma=0.5
-    # )
-    # SCHEDULER = exp_decay_scheduler(
-    #     OPTIMIZER, warmup_steps=NUM_TRAIN_STEPS // 10, gamma=0.9
-    # )
-
     # Training model
-    print("Number of unique batches: ", (train_data.shape[0] / BLOCK_SIZE) // BATCH_SIZE)
+    print(
+        "Number of unique batches: "\
+        f"{(train_data.shape[0] / setting['block_size']) // setting['batch_size']}"
+    )
     losses = train_and_evaluate_model(
         model=model,
         train_data=train_data,
         valid_data=valid_data,
-        block_size=BLOCK_SIZE,
-        batch_size=BATCH_SIZE,
         get_batch=get_batch,
-        optimizer=OPTIMIZER,  # internally uses AdamW, pass an optimizer to override
-        scheduler=SCHEDULER,
-        num_train_steps=NUM_TRAIN_STEPS,
-        verbosity_len=VERBOSTIY_LEN,
-        eval_iters=EVAL_ITERS,
+        optimizer=optimizer,
+        scheduler=scheduler,
         plot_loss=False,
-        device=DEVICE,
-        learning_rate=LEARNING_RATE  # part of kwargs
+        **setting
     )
-
-    plot_losses(losses["train"], VERBOSTIY_LEN, "temp.png", losses["valid"], losses["lrs"])
+    plot_losses(losses["train"], setting["verbosity_len"], "temp.png", losses["valid"], losses["lrs"])

@@ -1,0 +1,13 @@
+activation: gelu
+batch_size: 32
+block_size: 64
+embed_size: 32
+learning_rate: 0.001692542295775744
+lr_schedule: cosine
+min_learning_rate: 1.6943900564946291e-07
+n_layers: 5
+num_heads: 4
+optimizer_name: adamw
+prenorm: true
+warmup_factor: 0.1
+wide_factor: 2

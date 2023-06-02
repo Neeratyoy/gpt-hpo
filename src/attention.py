@@ -2,19 +2,19 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
-from utils import get_acquisition_function
+from src.utils import get_acquisition_function
 
 
 class Head(nn.Module):
     """ one head of self-attention """
 
-    def __init__(self, block_size: int, n_embed: int, head_size: int):
+    def __init__(self, block_size: int, embed_size: int, head_size: int):
         """
         Arguments
         ---------
         block_size: int
             The sentence length allowed
-        n_embed: int
+        embed_size: int
             The size (dimension) of the token embeddings
         head_size: int
             The size (dimension) of the output of an attention head
@@ -22,12 +22,12 @@ class Head(nn.Module):
         super().__init__()
 
         self.block_size = block_size  # equivalent to T
-        self.n_embed = n_embed  # equivalent to C
+        self.embed_size = embed_size  # equivalent to C
         self.head_size = head_size
 
-        self.key = nn.Linear(self.n_embed, self.head_size, bias=False)
-        self.query = nn.Linear(self.n_embed, self.head_size, bias=False)
-        self.value = nn.Linear(self.n_embed, self.head_size, bias=False)
+        self.key = nn.Linear(self.embed_size, self.head_size, bias=False)
+        self.query = nn.Linear(self.embed_size, self.head_size, bias=False)
+        self.value = nn.Linear(self.embed_size, self.head_size, bias=False)
 
         self.register_buffer(
             'tril', torch.tril(torch.ones(self.block_size, self.block_size))
@@ -56,14 +56,14 @@ class MultiHeadAttention(nn.Module):
     """ multiple heads of self-attention in parallel """
 
     def __init__(
-        self, block_size: int, n_embed: int, head_size: int, num_heads: int
+        self, block_size: int, embed_size: int, head_size: int, num_heads: int
     ):
         """
         Arguments
         ---------
         block_size: int
             The sentence length allowed
-        n_embed: int
+        embed_size: int
             The size (dimension) of the token embeddings
         head_size: int
             The size (dimension) of the output of an attention head
@@ -73,10 +73,10 @@ class MultiHeadAttention(nn.Module):
         """
         super().__init__()
         self.heads = nn.ModuleList(
-            [Head(block_size, n_embed, head_size) for _ in range(num_heads)]
+            [Head(block_size, embed_size, head_size) for _ in range(num_heads)]
         )
         # linear FC layer
-        self.proj = nn.Linear(head_size * num_heads, n_embed)
+        self.proj = nn.Linear(head_size * num_heads, embed_size)
 
     def forward(self, x):
         # simply stack multiple heads
@@ -91,7 +91,7 @@ class FeedForward(nn.Module):
 
     def __init__(
             self,
-            n_embed: int,
+            embed_size: int,
             wide_factor: int = 4,
             activation: str = "relu",
             dropout: float = 0.0
@@ -100,9 +100,9 @@ class FeedForward(nn.Module):
         self.activation = get_acquisition_function(activation)
         self.dropout = dropout
         self.net = nn.Sequential(
-            nn.Linear(n_embed, wide_factor * n_embed),
+            nn.Linear(embed_size, wide_factor * embed_size),
             self.activation(),
-            nn.Linear(wide_factor * n_embed, n_embed),
+            nn.Linear(wide_factor * embed_size, embed_size),
             nn.Dropout(self.dropout),
         )
 
@@ -116,7 +116,7 @@ class Block(nn.Module):
     def __init__(
         self,
         block_size: int,
-        n_embed: int,
+        embed_size: int,
         num_heads: int,
         wide_factor: int = 4,
         activation: str = "relu",  # could also be "gelu"
@@ -125,16 +125,16 @@ class Block(nn.Module):
     ):
         super().__init__()
         # setting head_size to be a factor of other dimensions
-        head_size = n_embed // num_heads
+        head_size = embed_size // num_heads
         # the multi-headed self-attention (msa)
-        self.msa = MultiHeadAttention(block_size, n_embed, head_size, num_heads)
-        self.ffwd = FeedForward(n_embed, wide_factor, activation, dropout)
+        self.msa = MultiHeadAttention(block_size, embed_size, head_size, num_heads)
+        self.ffwd = FeedForward(embed_size, wide_factor, activation, dropout)
 
         self.prenormalize = prenormalize
         if prenormalize:
-            self.pre_ln = nn.LayerNorm(n_embed)
-        self.ln1 = nn.LayerNorm(n_embed)
-        self.ln2 = nn.LayerNorm(n_embed)
+            self.pre_ln = nn.LayerNorm(embed_size)
+        self.ln1 = nn.LayerNorm(embed_size)
+        self.ln2 = nn.LayerNorm(embed_size)
 
     def forward(self, x):
         if self.prenormalize:
@@ -172,14 +172,14 @@ if __name__ == "__main__":
     # Hyperparameters for Multi-headed Self-Attention
     batch_size = 4
     block_size = 8
-    n_embed = 64
+    embed_size = 64
     head_size = 16
-    # having it as 4 would help align with current n_embed but for a general representation choosing 3
+    # having it as 4 would help align with current embed_size but for a general representation choosing 3
     num_heads = 3
 
     args = {
         "block_size": block_size,
-        "n_embed": n_embed,
+        "embed_size": embed_size,
         "head_size": head_size,
         "num_heads": num_heads
     }
@@ -191,5 +191,5 @@ if __name__ == "__main__":
 
     # Sampling a random tensor of the shape of a batch of data
     print("Sampling a random tensor of the shape of a batch of data...")
-    x = torch.randn(batch_size, block_size, n_embed)
+    x = torch.randn(batch_size, block_size, embed_size)
     print(x.shape)

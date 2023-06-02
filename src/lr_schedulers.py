@@ -105,3 +105,39 @@ def exp_decay_scheduler(optimizer, warmup_steps, gamma, last_epoch=-1):
         optimizer, lambda step: lr_lambda(step, warmup_steps, gamma, last_epoch)
     )
     return scheduler
+
+
+def get_lr_scheduler(
+        optimizer, 
+        scheduler_name, 
+        min_lr, 
+        max_steps, 
+        warmup_factor,
+        step_size=None,
+        gamma=None,
+        last_epoch=-1, 
+        T_mult=1
+    ):
+    if scheduler_name == 'cosine':
+        sch = cosine_scheduler(
+            optimizer, 
+            T_max=max_steps, 
+            eta_min=min_lr, 
+            warmup_steps=int(warmup_factor * max_steps),
+            T_mult=T_mult, 
+            last_epoch=last_epoch
+        )
+        pass
+    elif scheduler_name == 'step':
+        assert None not in [step_size, gamma]
+        sch = step_decay_scheduler(
+            optimizer, 
+            warmup_steps=int(warmup_factor * max_steps),
+            step_size=step_size, 
+            gamma=gamma, 
+            last_epoch=last_epoch
+        )
+        pass
+    else:
+        raise ValueError(f'{scheduler_name} not in {{step, cosine}}')
+    return sch

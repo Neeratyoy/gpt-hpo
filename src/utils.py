@@ -1,11 +1,14 @@
 from matplotlib import pyplot as plt
 import numpy as np
+import os
+from pathlib import Path
 import time
 import torch
 import torch.nn as nn
-from torch.optim import SGD, Adam, Adafactor
+from torch import optim as opt  # import SGD, Adam, Adafactor
 from tqdm import tqdm
 from typing import List, Tuple, Callable, Dict
+import yaml
 
 
 class Swish(nn.Module):
@@ -29,15 +32,16 @@ def get_acquisition_function(name: str):
 
 
 def get_optimizer(optimizer_name, model_params, lr):
+    # could refer to https://github.com/jettify/pytorch-optimizer for more optimizers
     if optimizer_name == 'sgd':
-        return SGD(model_params, lr=lr)
+        return opt.SGD(model_params, lr=lr)
     elif optimizer_name == 'adam':
-        return Adam(model_params, lr=lr)
-    elif optimizer_name == 'adafactor':
-        return Adafactor(model_params)
+        return opt.Adam(model_params, lr=lr)
+    elif optimizer_name == 'adamw':
+        return opt.AdamW(model_params, lr=lr)
     else:
-        raise ValueError(f'{optimizer_name} not in {{sgd, adam, adafactor}}')
-
+        raise ValueError(f'{optimizer_name} not in {{sgd, adam, adamw}}')
+    
 
 def plot_losses(losses, verbosity, filepath, val_losses=None, lrs=None):
     plt.clf()
@@ -88,58 +92,6 @@ def count_flops(model, input_shape):
     return flops[0].item()
 
 
-# TODO: verify this ChatGPT solution
-# def measure_throughput(model, input_data, batch_size=1, num_runs=10):
-#     """Measure the throughput (in samples per second) of a PyTorch model on input data."""
-#     # Set the model to evaluation mode
-#     model.eval()
-
-#     # Create a dataloader for the input data
-#     input_loader = torch.utils.data.DataLoader(input_data, batch_size=batch_size)
-
-#     # Warm up the GPU by running the model once on a small batch
-#     with torch.no_grad():
-#         input = next(iter(input_loader))
-#         model(input.cuda())
-
-#     # Measure the time required to run the model on the input data
-#     start_time = time.time()
-#     for i in range(num_runs):
-#         for input in input_loader:
-#             input = input.cuda()
-#             with torch.no_grad():
-#                 model(input)
-#     end_time = time.time()
-#     elapsed_time = end_time - start_time
-
-#     # Calculate the throughput in samples per second
-#     num_samples = len(input_data)
-#     throughput = num_samples * num_runs / elapsed_time
-
-#     return throughput
-
-
-# TODO: verify this Bing solution
-# import torch
-# import torch.nn as nn
-# from torchprofile import profile_macs
-
-# model = nn.Sequential(
-#     nn.Conv2d(3, 32, kernel_size=3, stride=1, padding=1),
-#     nn.ReLU(),
-#     nn.MaxPool2d(kernel_size=2, stride=2),
-#     nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
-#     nn.ReLU(),
-#     nn.MaxPool2d(kernel_size=2, stride=2),
-#     nn.Flatten(),
-#     nn.Linear(64 * 8 * 8, 10)
-# )
-
-# flops = profile_macs(model, (1, 3, 32, 32))
-# print(f"The model has approximately {flops / 1e6:.2f} million FLOPs.")
-
-
-
 @torch.no_grad()
 def estimate_loss(
         model: nn.Module,
@@ -162,7 +114,7 @@ def train_and_evaluate_model(
     get_batch: Callable,
     optimizer: torch.optim = None,
     scheduler: torch.optim.lr_scheduler = None,
-    num_train_steps: int = 10000,
+    max_steps: int = 10000,
     verbosity_len: int = 1000,
     eval_iters: int = 500,
     plot_loss: str = True,
@@ -179,10 +131,17 @@ def train_and_evaluate_model(
     valid_losses = [np.inf]
     lrs = []
 
-    for iter in tqdm(range(num_train_steps)):
+    for iter in tqdm(range(max_steps)):
 
         # sample a batch of data
-        xb, yb = get_batch('train', train_data, valid_data, block_size, batch_size, device)
+        xb, yb = get_batch(
+            'train', 
+            train_data, 
+            valid_data, 
+            block_size, 
+            batch_size, 
+            device
+        )
 
         # evaluate loss on the batch
         logits, loss = model(xb, yb)
@@ -200,11 +159,13 @@ def train_and_evaluate_model(
         valid_losses.append(valid_losses[-1])
 
         # every once in a while evaluate the loss on train and val sets
-        if iter % verbosity_len == 0 or iter == num_train_steps - 1:
+        if iter % verbosity_len == 0 or iter == max_steps - 1:
             model.eval()
             losses = []
             for _ in range(eval_iters):
-                X, Y = get_batch('valid', train_data, valid_data, block_size, batch_size, device)
+                X, Y = get_batch(
+                    'valid', train_data, valid_data, block_size, batch_size, device
+                )
                 losses.append(estimate_loss(model, X, Y))
             valid_losses[-1] = np.mean(losses)
             model.train()
@@ -261,3 +222,65 @@ def get_lr(optimizer):
     for param_group in optimizer.param_groups:
         lrs.append(param_group['lr'])
     return lrs
+
+
+def load_config(filename):
+    if ".yml" not in filename and ".yaml" not in filename:
+        filename = filename + ".yaml"
+    if "/" not in filename:
+        filename =  os.getcwd() + "/configs/" + filename 
+    with open(filename, "r") as f:
+        config = yaml.safe_load(f)
+    return config
+
+
+
+# TODO: verify this ChatGPT solution
+# def measure_throughput(model, input_data, batch_size=1, num_runs=10):
+#     """Measure the throughput (in samples per second) of a PyTorch model on input data."""
+#     # Set the model to evaluation mode
+#     model.eval()
+
+#     # Create a dataloader for the input data
+#     input_loader = torch.utils.data.DataLoader(input_data, batch_size=batch_size)
+
+#     # Warm up the GPU by running the model once on a small batch
+#     with torch.no_grad():
+#         input = next(iter(input_loader))
+#         model(input.cuda())
+
+#     # Measure the time required to run the model on the input data
+#     start_time = time.time()
+#     for i in range(num_runs):
+#         for input in input_loader:
+#             input = input.cuda()
+#             with torch.no_grad():
+#                 model(input)
+#     end_time = time.time()
+#     elapsed_time = end_time - start_time
+
+#     # Calculate the throughput in samples per second
+#     num_samples = len(input_data)
+#     throughput = num_samples * num_runs / elapsed_time
+
+#     return throughput
+
+
+# TODO: verify this Bing solution
+# import torch
+# import torch.nn as nn
+# from torchprofile import profile_macs
+
+# model = nn.Sequential(
+#     nn.Conv2d(3, 32, kernel_size=3, stride=1, padding=1),
+#     nn.ReLU(),
+#     nn.MaxPool2d(kernel_size=2, stride=2),
+#     nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
+#     nn.ReLU(),
+#     nn.MaxPool2d(kernel_size=2, stride=2),
+#     nn.Flatten(),
+#     nn.Linear(64 * 8 * 8, 10)
+# )
+
+# flops = profile_macs(model, (1, 3, 32, 32))
+# print(f"The model has approximately {flops / 1e6:.2f} million FLOPs.")
