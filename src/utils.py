@@ -131,6 +131,9 @@ def train_and_evaluate_model(
     valid_losses = [np.inf]
     lrs = []
 
+    # preparing logger
+    wandb_logger = None if "wandb" not  in kwargs else wandb
+
     for iter in tqdm(range(max_steps)):
 
         # sample a batch of data
@@ -174,6 +177,16 @@ def train_and_evaluate_model(
             print(
                 f"step {iter}: train loss={_train:.4f}, val loss={_valid:.4f}"
             )
+        
+        # logging
+        if "wandb_logger" in kwargs and kwargs["wandb_logger"]is not None:
+            wb = kwargs["wandb_logger"]
+            wb.log({
+                "train_loss": train_losses[-1],
+                "valid_loss": valid_losses[-1],
+                "lr": lrs[-1],
+                "step": iter
+            })
 
     if plot_loss:
         plot_losses(train_losses, verbosity_len, "temp.png", valid_losses, lrs)

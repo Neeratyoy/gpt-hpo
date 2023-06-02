@@ -3,6 +3,7 @@
 .vscode
 .DS_Store
 */.DS_Store
+wandb/
 
 # python
 __pycache__/

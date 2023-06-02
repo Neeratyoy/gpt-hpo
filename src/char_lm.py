@@ -13,6 +13,11 @@ from src.utils import (
     get_optimizer
 )
 
+import wandb
+
+
+wandb.init(project='char-lm')
+
 
 class CharLM(nn.Module):
 
@@ -156,9 +161,9 @@ if __name__ == "__main__":
 
     # Experiment HPs
     VOCAB_SIZE = vocab_size
-    NUM_TRAIN_STEPS = 10
+    NUM_TRAIN_STEPS = 100
     VERBOSTIY_LEN = 5
-    EVAL_ITERS = 5
+    EVAL_ITERS = NUM_TRAIN_STEPS // 10
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
     
     fixed_config = dict(
@@ -196,6 +201,8 @@ if __name__ == "__main__":
         optimizer=optimizer,
         scheduler=scheduler,
         plot_loss=False,
+        wandb_logger=wandb,
         **setting
     )
+    wandb.finish()
     plot_losses(losses["train"], setting["verbosity_len"], "temp.png", losses["valid"], losses["lrs"])
