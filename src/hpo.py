@@ -12,7 +12,6 @@ from src.char_lm import setup_model, setup_training
 from src.utils import count_trainable_params, train_and_evaluate_model, load_config
 
 
-
 def prepare_shakespeare(train_size=0.9, input_path="data/tinyshakespeare/input.txt"):
     vocab, text = extract_vocab_and_data(input_path)
     vocab_size = len(vocab)
@@ -24,6 +23,8 @@ def prepare_shakespeare(train_size=0.9, input_path="data/tinyshakespeare/input.t
         vocab_size=len(vocab),
         train_data=train_data,
         valid_data=valid_data,
+        encode=encode,
+        decode=decode
     )
     return shakespeare
 
@@ -37,18 +38,36 @@ def exp_setup(setup_args=None):
     
 
 def run(setting, verbose: str=True):
+    """ The DL pipeline executor.
+
+    Arguments
+    ---------
+    setting : dict of dicts
+        A hierarchy of dicts that are the arguments for the `setup_model` function.
+        It contains a `config` dict for mainly the search space hyperparameters, the 
+        subset that changes every run.
+        The `fixed_config` dict houses the task related hyperparameters that are less 
+        likely to change per run.
+        The optional `checkpoint` dict contains necessary information for reloading an 
+        existing DL pipeline state saved to disk.
+        Note that the `setup_model` modifies and flattens these dicts. Since `config` and
+        `fixed_config` could contain the same hyperparameter, the flattening happens with 
+        precedence over the `fixed_config` dict values.
+    """
     # Setup logger
     wandb_args = dict(project="lm-hpo")
     if "log_name" in setting:
         wandb_args.update(dict(name=setting["log_name"]))
-    wandb.init(**wandb_args)
+    
+    wandb.init(**wandb_args, config=setting["config"].copy())
 
     # Load defaults
-    model, setting = setup_model(**setting)
+    model, setting = setup_model(**setting)  # setting is now flattened
     # Print the number of parameters in the model
     if verbose:
+        print(setting)
         print(count_trainable_params(model)/1e6, 'M parameters')
-
+    
     # Training setup
     optimizer, scheduler = setup_training(model, **setting)
 
@@ -62,7 +81,7 @@ def run(setting, verbose: str=True):
         wandb_logger=wandb,
     )
     wandb.finish()
-    
+
     # TODO: log output to return
     return 1     
 
@@ -83,12 +102,14 @@ if __name__ == "__main__":
         )
     ))
 
-    cs = charLM_space_CS()
-    config = cs.sample_configuration()
+    # cs = charLM_space_CS()
+    # config = cs.sample_configuration()
+    config = load_config("charLM-default")
+    fixed_setting["log_name"] = "charLM-default"
 
     setting = dict()
     setting.update(dict(
-        config=config.get_dictionary().copy(),
+        config=config.copy(),  # get_dictionary().copy(),
         fixed_config=fixed_setting,   # important step 
         
     ))

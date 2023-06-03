@@ -153,7 +153,7 @@ def setup_training(
         step_size=None if "step_size" not in kwargs else kwargs["step_size"],
         gamma=None if "gamma" not in kwargs else kwargs["gamma"],
         last_epoch=-1,  # TODO: load from checkpoint 
-        T_mult=None if "T_mult" not in kwargs else kwargs["T_mult"]
+        T_mult=1 if "T_mult" not in kwargs else kwargs["T_mult"]
     )
     scheduler = get_lr_scheduler(
         optimizer,
