@@ -237,6 +237,24 @@ def load_config(filename):
     return config
 
 
+def set_seed(seed):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    try:
+        np.random.seed(seed)
+    except NameError:
+        # was not imported
+        import numpy as np
+        np.random.seed(seed)
+    try:
+        random.seed(seed)
+    except NameError:
+        # was not imported
+        import random
+        random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
 
 # TODO: verify this ChatGPT solution
 # def measure_throughput(model, input_data, batch_size=1, num_runs=10):

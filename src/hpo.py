@@ -9,7 +9,7 @@ from data.data_prep_tinyshakespeare import (
         extract_vocab_and_data, create_text_encoder_decoder, create_data_splits, get_batch
     )
 from src.char_lm import setup_model, setup_training
-from src.utils import count_trainable_params, train_and_evaluate_model, load_config
+from src.utils import count_trainable_params, load_config, set_seed, train_and_evaluate_model
 
 
 def prepare_shakespeare(train_size=0.9, input_path="data/tinyshakespeare/input.txt"):
@@ -61,6 +61,9 @@ def run(setting, verbose: str=True):
     
     wandb.init(**wandb_args, config=setting["config"].copy())
 
+    # Set the seed
+    set_seed(setting["fixed_config"]["seed"]) 
+
     # Load defaults
     model, setting = setup_model(**setting)  # setting is now flattened
     # Print the number of parameters in the model
@@ -87,6 +90,7 @@ def run(setting, verbose: str=True):
 
 
 if __name__ == "__main__":
+
     d = prepare_shakespeare()
     exp_args = exp_setup()
 
