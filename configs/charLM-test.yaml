@@ -1,6 +1,6 @@
 activation: gelu
 batch_size: 32
-block_size: 32
+block_size: 64
 embed_size: 32
 learning_rate: 0.001692542295775744
 lr_schedule: cosine

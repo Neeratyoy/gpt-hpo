@@ -1,3 +1,4 @@
+from pathlib import Path
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
@@ -11,6 +12,7 @@ from src.utils import (
     estimate_loss, 
     plot_losses, 
     count_trainable_params, 
+    load_checkpoint,
     load_config,
     get_optimizer
 )
@@ -114,8 +116,10 @@ class CharLM(nn.Module):
 
 
 def setup_model(
-    config: Union[str, dict]=None, fixed_config: dict=None, checkpoint=None, **kwargs
+    config: Union[str, dict]=None, fixed_config: dict=None, **kwargs
 ) -> tuple([nn.Module, dict]):
+    """ Instantiates the model as per arguments passed.
+    """
     if config is None or isinstance(config, str):
         default_setting = load_config(config_name)
     elif isinstance(config, dict):
@@ -133,6 +137,7 @@ def setup_model(
         device = "cuda" if torch.cuda.is_available() else "cpu"
         default_setting["device"] = device
     model = model.to(default_setting["device"])
+
     return model, default_setting
 
 
@@ -159,39 +164,43 @@ def setup_training(
         optimizer,
         **scheduler_args
     )
-    return optimizer, scheduler
+
+    # loading checkpoints if available
+    current_step = 0
+    if checkpoint is not None and isinstance(checkpoint, str):
+        current_step, info = load_checkpoint(checkpoint, model, optimizer, scheduler)
+        print(f"Loaded checkpoint at {current_step}")
+    return optimizer, scheduler, current_step, info
 
 
 if __name__ == "__main__":
-    # Preparing data
-    from data.data_prep_tinyshakespeare import (
-        extract_vocab_and_data, create_text_encoder_decoder, create_data_splits, get_batch
-    )
 
-    train_size = 0.9
-    input_path = "data/tinyshakespeare/input.txt"
-    vocab, text = extract_vocab_and_data(input_path)
-    vocab_size = len(vocab)
-    encode, decode = create_text_encoder_decoder(vocab)
-    data, train_data, valid_data = create_data_splits(text, train_size, encode, decode)
+    d = prepare_shakespeare()
 
-    # Experiment HPs
-    VOCAB_SIZE = vocab_size
-    NUM_TRAIN_STEPS = 100
-    VERBOSTIY_LEN = 5
-    EVAL_ITERS = NUM_TRAIN_STEPS // 10
-    DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-    
-    fixed_config = dict(
-        max_steps = NUM_TRAIN_STEPS,
-        verbosity_len = VERBOSTIY_LEN,
-        eval_iters = EVAL_ITERS,
-        device = DEVICE,
-        # scheduler defaults
-        T_mult = 1,
-        gamma = None,
-        step_size = None
-    )
+    name = "charLM-test.yaml"
+    fixed_setting = exp_setup(f"setup_{name}")
+
+    # adding dataloader as part of experiment setup
+    fixed_setting.update(dict(
+        vocab_size=d["vocab_size"], 
+        dataloader=lambda split, batch_size: get_batch(
+            split=split, batch_size=batch_size, block_size=fixed_setting["block_size"],
+            train_data=d["train_data"], valid_data=d["valid_data"], 
+        )
+    ))
+
+    config = load_config(name)
+    fixed_setting["log_name"] = name
+
+    setting = dict()
+    setting.update(dict(
+        config=config.copy(),  # get_dictionary().copy(),
+        fixed_config=fixed_setting,   # important step 
+        
+    ))
+    print("Running an evaluation...")
+
+
 
     # Load defaults
     model, setting = setup_model(
@@ -201,7 +210,7 @@ if __name__ == "__main__":
     print(count_trainable_params(model)/1e6, 'M parameters')
 
     # Training setup
-    optimizer, scheduler = setup_training(model, setting)
+    optimizer, scheduler, steps, _ = setup_training(model, setting)
 
     # Training model
     losses = train_and_evaluate_model(
@@ -216,4 +225,6 @@ if __name__ == "__main__":
         **setting
     )
     wandb.finish()
-    plot_losses(losses["train"], setting["verbosity_len"], "temp.png", losses["valid"], losses["lrs"])
+    plot_losses(
+        losses["train"], plot_path, losses["valid"], losses["lrs"]
+    )

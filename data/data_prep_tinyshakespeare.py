@@ -86,22 +86,48 @@ def get_batch(
     assert split in ["train", "valid"]
     if device is None:
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    data = train_data if split == 'train' else valid_data
-    # generating random indices as markers in the full text document
-    # such that they are a starting point to the sentence of length
-    # `block_size` that will be a data point in the batch
-    ix = torch.randint(
-        low=0, high=len(data) - block_size, size=(batch_size,)
-    )
+    if split == 'train':
+        data = train_data
+        # generating random indices as markers in the full text document
+        # such that they are a starting point to the sentence of length
+        # `block_size` that will be a data point in the batch
+        ix = torch.randint(
+            low=0, high=len(data) - block_size, size=(batch_size,)
+        )
+    elif split == 'valid':
+        # dropping the last incomplete batch 
+        data = valid_data[:(len(valid_data) // block_size) * block_size]
+        # generating indices as markers in the full text document
+        ix = torch.arange(start=0, end=len(data) - block_size, step=block_size)
+    else:
+        raise ValueError(f"Invalid split choice: {split}")
+    
     # extracting a sentence of length `block_size` for every
     # random starting point in `ix`
     x = torch.stack([data[i:i+block_size] for i in ix])
     # extracting a sentence of length `block_size` for every
     # random starting point in `ix` + 1 (shifted to right)
     y = torch.stack([data[i+1:i+block_size+1] for i in ix])
+   
     x, y = x.to(device), y.to(device)
     return x, y
 
+
+def prepare_shakespeare(train_size=0.9, input_path="data/tinyshakespeare/input.txt"):
+    vocab, text = extract_vocab_and_data(input_path)
+    vocab_size = len(vocab)
+    encode, decode = create_text_encoder_decoder(vocab)
+    data, train_data, valid_data = create_data_splits(text, train_size, encode, decode)
+
+    shakespeare = dict(
+        vocab=vocab,
+        vocab_size=len(vocab),
+        train_data=train_data,
+        valid_data=valid_data,
+        encode=encode,
+        decode=decode
+    )
+    return shakespeare
 
 
 if __name__ == "__main__":

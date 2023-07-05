@@ -2,6 +2,7 @@ from matplotlib import pyplot as plt
 import numpy as np
 import os
 from pathlib import Path
+import random
 import time
 import torch
 import torch.nn as nn
@@ -43,13 +44,13 @@ def get_optimizer(optimizer_name, model_params, lr):
         raise ValueError(f'{optimizer_name} not in {{sgd, adam, adamw}}')
     
 
-def plot_losses(losses, verbosity, filepath, val_losses=None, lrs=None):
+def plot_losses(losses, filepath, val_losses=None, lrs=None):
     plt.clf()
     plt.plot(losses, label="train");
     if val_losses is not None:
         plt.plot(val_losses, label="valid");
     plt.ylabel("Loss")
-    plt.xlabel(f"Num steps (~{verbosity}x)")
+    plt.xlabel(f"Num steps")
     plt.xlim(0, len(losses))
     plt.legend(loc="upper right");
     if lrs is not None:
@@ -115,6 +116,7 @@ def train_and_evaluate_model(
     verbosity_len: int = 1000,
     eval_iters: int = 500,
     plot_loss: str = True,
+    info: dict = None,
     device: str = "cpu",
     **kwargs
 ) -> Dict[str, List[float]]:
@@ -124,19 +126,28 @@ def train_and_evaluate_model(
             model.parameters(), lr=kwargs["learning_rate"]
         )
 
-    train_losses = [np.inf]
-    valid_losses = [np.inf]
-    lrs = []
+    if info is None:
+        train_losses = [np.inf]
+        valid_losses = [np.inf]
+        lrs = []
+    else:
+        train_losses = info["train_losses"]
+        valid_losses = info["valid_losses"]
+        lrs = info["lrs"]
 
     # preparing logger
-    wandb_logger = None if "wandb" not  in kwargs else wandb
+    wandb_logger = None if "wandb" not in kwargs else wandb
 
-    for iter in tqdm(range(max_steps)):
+    # setting iteration state
+    curr_step = kwargs["curr_step"] if "curr_step" in kwargs else 0
+
+    # training loop
+    for iter in tqdm(range(curr_step, max_steps)):
 
         # sample a batch of data
         split = "train"
         xb, yb = dataloader(split, batch_size)
-
+    
         # evaluate loss on the batch
         logits, loss = model(xb, yb)
         optimizer.zero_grad(set_to_none=True)
@@ -152,21 +163,32 @@ def train_and_evaluate_model(
         train_losses.append(loss.item())
         valid_losses.append(valid_losses[-1])
 
-        # every once in a while evaluate the loss on train and val sets
+        # evaluate the loss on train and val sets every `verbosity_len` steps
         if (iter + 1) % verbosity_len == 0 or iter == max_steps - 1:
             model.eval()
-            losses = []
-            for _ in range(eval_iters):
-                split = "valid"
-                X, Y = dataloader(split, batch_size)
-                losses.append(estimate_loss(model, X, Y))
-            valid_losses[-1] = np.mean(losses)
+            
+            X, Y = dataloader(split="valid", batch_size=None)
+            valid_loss = estimate_loss(model, X, Y)
+            valid_losses[-1] = valid_loss
+
             model.train()
             _train = np.mean(train_losses[-1])
             _valid = np.mean(valid_losses[-1])
             print(
                 f"step {iter}: train loss={_train:.4f}, val loss={_valid:.4f}"
             )
+            if "checkpoint" in kwargs and kwargs["checkpoint"] is not None:
+                save_checkpoint(
+                    path=Path(os.getcwd()) / kwargs["checkpoint"],
+                    model=model,
+                    optimizer=optimizer,
+                    lr_scheduler=scheduler,
+                    steps=iter,
+                    train_losses=train_losses,
+                    valid_losses=valid_losses,
+                    lrs=lrs,
+                )
+                print("Checkpoint saved")
         
         # logging
         if "wandb_logger" in kwargs and kwargs["wandb_logger"]is not None:
@@ -179,13 +201,27 @@ def train_and_evaluate_model(
             })
 
     if plot_loss:
-        plot_losses(train_losses, verbosity_len, "temp.png", valid_losses, lrs)
+        plot_losses(train_losses, "temp.png", valid_losses, lrs)
     _losses = {
         "train": train_losses,
         "valid": valid_losses,
         "lrs": lrs,
     }
     return _losses
+
+
+def evaluate_model(
+    model: nn.Module,
+    dataloader: Callable,
+) -> Dict[str, List[float]]:
+    
+    model.eval()
+    X, Y = dataloader(split="valid", batch_size=None)
+    print(X.shape, Y.shape)
+    loss = estimate_loss(model, X, Y)
+    model.train()
+    print(f"Validation loss: {loss:.4f}")
+    return loss
 
 
 def generate_from_model(
@@ -232,12 +268,15 @@ def load_config(filename):
         filename = filename + ".yaml"
     if "/" not in filename:
         filename =  os.getcwd() + "/configs/" + filename 
+    print("loading from", filename)
     with open(filename, "r") as f:
         config = yaml.safe_load(f)
     return config
 
 
 def set_seed(seed):
+    """ Function to set all relevant random seed states.
+    """
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     try:
@@ -254,6 +293,114 @@ def set_seed(seed):
         random.seed(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+
+
+def log_weight_statistics(model):
+    for i, (name, param) in enumerate(model.named_parameters()):
+        print(f"{name}: mean={param.data.mean():.6f}, std={param.data.std():.6f}")
+        if i == 5:
+            break
+
+
+def save_checkpoint(
+        path: Path, 
+        model: nn.Module, 
+        optimizer: torch.optim, 
+        lr_scheduler: torch.optim.lr_scheduler, 
+        steps: int,
+        train_losses: list,
+        valid_losses: list,
+        lrs: list,
+    ) -> None:
+    """ Saves the model weights and state of the training pipeline.
+    """
+    path = Path(path) / "checkpoints.pt"
+    checkpoint = {
+        'steps': steps,
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+        'lr_scheduler_state_dict': lr_scheduler.state_dict(),
+        'train_losses': train_losses,
+        'valid_losses': valid_losses,
+        'lrs': lrs,
+        'torch_rng_state': torch.get_rng_state(),
+        'cuda_rng_state': torch.cuda.get_rng_state_all(),
+        'random_rng_state': random.getstate(),
+        'numpy_rng_state': np.random.get_state(),
+    }
+    torch.save(checkpoint, path)
+
+
+def load_checkpoint(
+        path: str, 
+        model: nn.Module = None, 
+        optimizer: torch.optim = None, 
+        lr_scheduler: torch.optim.lr_scheduler = None
+    ) -> Tuple[int, dict]:
+    """ Loads the model weights and state of the training pipeline.
+    """
+    path = Path(path) / "checkpoints.pt"
+    if not os.path.isfile(path):
+        print(f"Checkpoint file not found at {path}")
+        return 0, None
+    checkpoint = torch.load(path)
+
+    model.load_state_dict(checkpoint['model_state_dict'])
+    
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    lr_scheduler.load_state_dict(checkpoint['lr_scheduler_state_dict'])
+    steps = checkpoint['steps']
+    info = {
+        'train_losses': checkpoint["train_losses"],
+        'valid_losses': checkpoint["valid_losses"],
+        'lrs': checkpoint["lrs"],
+    }
+
+    # IMPORTANT: set the random seed states
+    torch.set_rng_state(checkpoint['torch_rng_state'])
+    torch.cuda.set_rng_state_all(checkpoint['cuda_rng_state'])
+    random.setstate(checkpoint['random_rng_state'])
+    np.random.set_state(checkpoint['numpy_rng_state'])
+
+    return steps, info
+
+
+def exp_setup(setup_args: str=None):
+    if setup_args is None:
+        setup_args = load_config("setup_charLM-default")
+    if isinstance(setup_args, str):
+        setup_args = load_config(setup_args)
+    if "device" not in setup_args or setup_args["device"] is None:
+        setup_args["device"] = "cuda" if torch.cuda.is_available() else "cpu"
+    return setup_args
+
+
+# TODO: verify this Bing AI solution
+# import torch
+# from torch.utils.data import DataLoader, Dataset
+
+# class TextDataset(Dataset):
+#     def __init__(self, data):
+#         self.data = data
+
+#     def __len__(self):
+#         return len(self.data)
+
+#     def __getitem__(self, idx):
+#         return self.data[idx]
+
+# def create_data_loader(data, batch_size, shuffle):
+#     # create a dataset from the data
+#     dataset = TextDataset(data)
+
+#     # create a data loader from the dataset
+#     data_loader = DataLoader(
+#         dataset,
+#         batch_size=batch_size,
+#         shuffle=shuffle
+#     )
+
+#     return data_loader
 
 
 # TODO: verify this ChatGPT solution

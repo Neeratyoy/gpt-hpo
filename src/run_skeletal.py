@@ -3,38 +3,19 @@ Defines a training function to take a configuration, train, and return results.
 """
 
 import torch
-import wandb
+# import wandb
 
-from data.data_prep_tinyshakespeare import (
-        extract_vocab_and_data, create_text_encoder_decoder, create_data_splits, get_batch
-    )
+from data.data_prep_tinyshakespeare import get_batch, prepare_shakespeare
 from src.char_lm import setup_model, setup_training
-from src.utils import count_trainable_params, load_config, set_seed, train_and_evaluate_model
-
-
-def prepare_shakespeare(train_size=0.9, input_path="data/tinyshakespeare/input.txt"):
-    vocab, text = extract_vocab_and_data(input_path)
-    vocab_size = len(vocab)
-    encode, decode = create_text_encoder_decoder(vocab)
-    data, train_data, valid_data = create_data_splits(text, train_size, encode, decode)
-
-    shakespeare = dict(
-        vocab=vocab,
-        vocab_size=len(vocab),
-        train_data=train_data,
-        valid_data=valid_data,
-        encode=encode,
-        decode=decode
-    )
-    return shakespeare
-
-
-def exp_setup(setup_args=None):
-    if setup_args is None:
-        setup_args = load_config("setup_charLM-default")
-    if "device" not in setup_args or setup_args["device"] is None:
-        setup_args["device"] = "cuda" if torch.cuda.is_available() else "cpu"
-    return setup_args
+from src.utils import (
+    count_trainable_params, 
+    load_config, 
+    set_seed, 
+    train_and_evaluate_model, 
+    evaluate_model, 
+    exp_setup,
+    log_weight_statistics
+)
     
 
 def run(setting, verbose: str=True):
@@ -59,7 +40,7 @@ def run(setting, verbose: str=True):
     if "log_name" in setting:
         wandb_args.update(dict(name=setting["log_name"]))
     
-    wandb.init(**wandb_args, config=setting["config"].copy())
+    # wandb.init(**wandb_args, config=setting["config"].copy())
 
     # Set the seed
     set_seed(setting["fixed_config"]["seed"]) 
@@ -72,7 +53,7 @@ def run(setting, verbose: str=True):
         print(count_trainable_params(model)/1e6, 'M parameters')
     
     # Training setup
-    optimizer, scheduler = setup_training(model, **setting)
+    optimizer, scheduler, curr_step, info = setup_training(model, **setting)
 
     # Training model
     losses = train_and_evaluate_model(
@@ -80,10 +61,12 @@ def run(setting, verbose: str=True):
         **setting,
         optimizer=optimizer,
         scheduler=scheduler,
-        plot_loss=False,
-        wandb_logger=wandb,
+        curr_step=curr_step,
+        plot_loss=True,
+        info=info,
+        # wandb_logger=wandb,
     )
-    wandb.finish()
+    # wandb.finish()
 
     # TODO: log output to return
     return 1     
@@ -92,11 +75,10 @@ def run(setting, verbose: str=True):
 if __name__ == "__main__":
 
     d = prepare_shakespeare()
-    exp_args = exp_setup()
 
-    from src.search_space import charLM_space_CS
-    
-    fixed_setting = exp_setup()
+    name = "charLM-test.yaml"
+    fixed_setting = exp_setup(f"setup_{name}")
+
     # adding dataloader as part of experiment setup
     fixed_setting.update(dict(
         vocab_size=d["vocab_size"], 
@@ -106,14 +88,12 @@ if __name__ == "__main__":
         )
     ))
 
-    # cs = charLM_space_CS()
-    # config = cs.sample_configuration()
-    config = load_config("charLM-default")
-    fixed_setting["log_name"] = "charLM-default"
+    config = load_config(name)
+    fixed_setting["log_name"] = name
 
     setting = dict()
     setting.update(dict(
-        config=config.copy(),  # get_dictionary().copy(),
+        config=config.copy(),
         fixed_config=fixed_setting,   # important step 
         
     ))

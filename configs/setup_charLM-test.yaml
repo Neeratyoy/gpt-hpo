@@ -1,0 +1,8 @@
+max_steps: 200
+eval_iters: 20
+verbosity_len: 25
+device: null
+seed: 1234
+checkpoint: debug/
+
+block_size: 64
