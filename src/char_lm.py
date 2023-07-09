@@ -42,8 +42,8 @@ class CharLM(nn.Module):
         # token from a lookup table
         # Note attention does not have any notion of colocation
         # of characters/words and this is important for lms
-        self.token_embedding_table = nn.Embedding(vocab_size, embed_size)  # , device=self.device)
-        self.position_embedding_table = nn.Embedding(block_size, embed_size)  # , device=self.device)
+        self.token_embedding_table = nn.Embedding(vocab_size, embed_size, device=self.device)
+        self.position_embedding_table = nn.Embedding(block_size, embed_size, device=self.device)
         self.blocks = nn.Sequential(
             *[Block(
                 block_size=block_size,
@@ -55,8 +55,9 @@ class CharLM(nn.Module):
                 prenormalize=prenormalize,
             ) for _ in range(n_layers)]  # stacks the layers of Transformer blocks
         )
-        self.ln_f = nn.LayerNorm(embed_size)  #, device=self.device)  # final layer norm (has bias)
-        self.lm_head = nn.Linear(embed_size, vocab_size)  #, device=self.device)
+        self.blocks = self.blocks.to(self.device)
+        self.ln_f = nn.LayerNorm(embed_size, device=self.device)  # final layer norm (has bias)
+        self.lm_head = nn.Linear(embed_size, vocab_size, device=self.device)
 
 
     def forward(self, idx, targets=None):

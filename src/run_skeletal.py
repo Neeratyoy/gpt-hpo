@@ -1,7 +1,7 @@
 """
 Defines a training function to take a configuration, train, and return results.
 """
-
+import time
 import wandb
 
 from data.data_prep_tinyshakespeare import get_batch, prepare_shakespeare
@@ -54,6 +54,7 @@ def run(setting, verbose: str=True):
     optimizer, scheduler, curr_step, info = setup_training(model, **setting)
 
     # Training model
+    start = time.time()
     losses = train_and_evaluate_model(
         model=model,
         **setting,
@@ -64,12 +65,17 @@ def run(setting, verbose: str=True):
         info=info,
         # wandb_logger=wandb,
     )
+    runtime = time.time() - start
 
     # Kill logger
     wandb.finish()
 
-    # TODO: log output to return
-    return 1     
+    result = dict(
+        loss=losses["valid"][-1],
+        cost=runtime,
+    )
+    result.update(losses)
+    return result
 
 
 if __name__ == "__main__":
