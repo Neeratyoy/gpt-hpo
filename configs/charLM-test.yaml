@@ -1,10 +1,10 @@
 activation: gelu
-batch_size: 32
-block_size: 64
-embed_size: 32
-learning_rate: 0.001692542295775744
+batch_size: 64
+block_size: 32
+embed_size: 64
+learning_rate: 3.0e-4
 lr_schedule: cosine
-min_learning_rate: 1.6943900564946291e-07
+min_learning_rate: 0
 n_layers: 2
 num_heads: 2
 optimizer_name: adamw

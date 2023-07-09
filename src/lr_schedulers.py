@@ -44,8 +44,22 @@ def lr_lambda(step, T_max, eta_min, T_mult):
 """
 
 import math
+import torch
 
 from torch.optim.lr_scheduler import LambdaLR
+
+
+def constant_scheduler(optimizer, lr):
+    """
+    Constant learning rate schedule.
+    """
+    def lr_lambda(step):
+        return 1
+
+    scheduler = LambdaLR(optimizer, lr_lambda)
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
+    return scheduler
 
 
 def cosine_scheduler(optimizer, T_max, eta_min=0, warmup_steps=500, T_mult=1, last_epoch=-1):
@@ -118,7 +132,9 @@ def get_lr_scheduler(
         last_epoch=-1, 
         T_mult=1
     ):
-    if scheduler_name == 'cosine':
+    if scheduler_name == 'constant':
+        sch = constant_scheduler(optimizer, min_lr)
+    elif scheduler_name == 'cosine':
         sch = cosine_scheduler(
             optimizer, 
             T_max=max_steps, 
@@ -127,7 +143,6 @@ def get_lr_scheduler(
             T_mult=T_mult, 
             last_epoch=last_epoch
         )
-        pass
     elif scheduler_name == 'step':
         assert None not in [step_size, gamma]
         sch = step_decay_scheduler(
@@ -137,7 +152,6 @@ def get_lr_scheduler(
             gamma=gamma, 
             last_epoch=last_epoch
         )
-        pass
     else:
         raise ValueError(f'{scheduler_name} not in {{step, cosine}}')
     return sch

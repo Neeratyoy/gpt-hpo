@@ -10,6 +10,7 @@ from src.lr_schedulers import get_lr_scheduler
 from src.utils import (
     train_and_evaluate_model, 
     estimate_loss, 
+    evaluate_model,
     plot_losses, 
     count_trainable_params, 
     load_checkpoint,
@@ -164,12 +165,16 @@ def setup_training(
         optimizer,
         **scheduler_args
     )
+    # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+    #     optimizer, scheduler_args["max_steps"]
+    # )
 
     # loading checkpoints if available
     current_step = 0
     if checkpoint is not None and isinstance(checkpoint, str):
         current_step, info = load_checkpoint(checkpoint, model, optimizer, scheduler)
         print(f"Loaded checkpoint at {current_step}")
+
     return optimizer, scheduler, current_step, info
 
 
@@ -200,8 +205,6 @@ if __name__ == "__main__":
     ))
     print("Running an evaluation...")
 
-
-
     # Load defaults
     model, setting = setup_model(
         vocab_size=VOCAB_SIZE, fixed_config=fixed_config, checkpoint=None
@@ -226,5 +229,5 @@ if __name__ == "__main__":
     )
     wandb.finish()
     plot_losses(
-        losses["train"], plot_path, losses["valid"], losses["lrs"]
+        losses["train"], plot_path, losses["valid"], losses["lrs"], smooth=True
     )

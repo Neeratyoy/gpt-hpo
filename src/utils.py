@@ -3,6 +3,7 @@ import numpy as np
 import os
 from pathlib import Path
 import random
+from scipy.signal import savgol_filter
 import time
 import torch
 import torch.nn as nn
@@ -18,7 +19,7 @@ class Swish(nn.Module):
         return x * torch.sigmoid(x)
 
 
-def get_acquisition_function(name: str):
+def get_activation_function(name: str):
     acquisition_map = dict(
         relu=nn.ReLU,
         gelu=nn.GELU,
@@ -44,9 +45,12 @@ def get_optimizer(optimizer_name, model_params, lr):
         raise ValueError(f'{optimizer_name} not in {{sgd, adam, adamw}}')
     
 
-def plot_losses(losses, filepath, val_losses=None, lrs=None):
+def plot_losses(losses, filepath, val_losses=None, lrs=None, smooth=True):
     plt.clf()
     plt.plot(losses, label="train");
+    if smooth:
+        smoothed_losses = savgol_filter(losses, 51, 3)
+        plt.plot(smoothed_losses, label="train (smoothed)");
     if val_losses is not None:
         plt.plot(val_losses, label="valid");
     plt.ylabel("Loss")
@@ -165,13 +169,9 @@ def train_and_evaluate_model(
 
         # evaluate the loss on train and val sets every `verbosity_len` steps
         if (iter + 1) % verbosity_len == 0 or iter == max_steps - 1:
-            model.eval()
-            
-            X, Y = dataloader(split="valid", batch_size=None)
-            valid_loss = estimate_loss(model, X, Y)
+            model.eval()    
+            valid_loss = evaluate_model(model, dataloader)
             valid_losses[-1] = valid_loss
-
-            model.train()
             _train = np.mean(train_losses[-1])
             _valid = np.mean(valid_losses[-1])
             print(
@@ -188,8 +188,8 @@ def train_and_evaluate_model(
                     valid_losses=valid_losses,
                     lrs=lrs,
                 )
-                print("Checkpoint saved")
-        
+            model.train()
+
         # logging
         if "wandb_logger" in kwargs and kwargs["wandb_logger"]is not None:
             wb = kwargs["wandb_logger"]
@@ -201,7 +201,7 @@ def train_and_evaluate_model(
             })
 
     if plot_loss:
-        plot_losses(train_losses, "temp.png", valid_losses, lrs)
+        plot_losses(train_losses, "temp.png", valid_losses, lrs, smooth=True)
     _losses = {
         "train": train_losses,
         "valid": valid_losses,
@@ -210,17 +210,18 @@ def train_and_evaluate_model(
     return _losses
 
 
+@torch.no_grad()
 def evaluate_model(
     model: nn.Module,
     dataloader: Callable,
 ) -> Dict[str, List[float]]:
-    
+    """ Evaluates the model on the validation set. 
+    """
     model.eval()
     X, Y = dataloader(split="valid", batch_size=None)
-    print(X.shape, Y.shape)
     loss = estimate_loss(model, X, Y)
     model.train()
-    print(f"Validation loss: {loss:.4f}")
+
     return loss
 
 
@@ -299,6 +300,7 @@ def log_weight_statistics(model):
     for i, (name, param) in enumerate(model.named_parameters()):
         print(f"{name}: mean={param.data.mean():.6f}, std={param.data.std():.6f}")
         if i == 5:
+            print()
             break
 
 
@@ -346,7 +348,7 @@ def load_checkpoint(
     checkpoint = torch.load(path)
 
     model.load_state_dict(checkpoint['model_state_dict'])
-    
+
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     lr_scheduler.load_state_dict(checkpoint['lr_scheduler_state_dict'])
     steps = checkpoint['steps']
@@ -401,54 +403,3 @@ def exp_setup(setup_args: str=None):
 #     )
 
 #     return data_loader
-
-
-# TODO: verify this ChatGPT solution
-# def measure_throughput(model, input_data, batch_size=1, num_runs=10):
-#     """Measure the throughput (in samples per second) of a PyTorch model on input data."""
-#     # Set the model to evaluation mode
-#     model.eval()
-
-#     # Create a dataloader for the input data
-#     input_loader = torch.utils.data.DataLoader(input_data, batch_size=batch_size)
-
-#     # Warm up the GPU by running the model once on a small batch
-#     with torch.no_grad():
-#         input = next(iter(input_loader))
-#         model(input.cuda())
-
-#     # Measure the time required to run the model on the input data
-#     start_time = time.time()
-#     for i in range(num_runs):
-#         for input in input_loader:
-#             input = input.cuda()
-#             with torch.no_grad():
-#                 model(input)
-#     end_time = time.time()
-#     elapsed_time = end_time - start_time
-
-#     # Calculate the throughput in samples per second
-#     num_samples = len(input_data)
-#     throughput = num_samples * num_runs / elapsed_time
-
-#     return throughput
-
-
-# TODO: verify this Bing solution
-# import torch
-# import torch.nn as nn
-# from torchprofile import profile_macs
-
-# model = nn.Sequential(
-#     nn.Conv2d(3, 32, kernel_size=3, stride=1, padding=1),
-#     nn.ReLU(),
-#     nn.MaxPool2d(kernel_size=2, stride=2),
-#     nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
-#     nn.ReLU(),
-#     nn.MaxPool2d(kernel_size=2, stride=2),
-#     nn.Flatten(),
-#     nn.Linear(64 * 8 * 8, 10)
-# )
-
-# flops = profile_macs(model, (1, 3, 32, 32))
-# print(f"The model has approximately {flops / 1e6:.2f} million FLOPs.")

@@ -39,19 +39,18 @@ def run(setting, verbose: str=True):
     wandb_args = dict(project="lm-hpo")
     if "log_name" in setting:
         wandb_args.update(dict(name=setting["log_name"]))
-    
-    # wandb.init(**wandb_args, config=setting["config"].copy())
+    wandb.init(**wandb_args, config=setting["config"].copy())
 
     # Set the seed
     set_seed(setting["fixed_config"]["seed"]) 
 
     # Load defaults
     model, setting = setup_model(**setting)  # setting is now flattened
-    # Print the number of parameters in the model
     if verbose:
+        # Print the number of parameters in the model
         print(setting)
         print(count_trainable_params(model)/1e6, 'M parameters')
-    
+
     # Training setup
     optimizer, scheduler, curr_step, info = setup_training(model, **setting)
 
@@ -66,7 +65,9 @@ def run(setting, verbose: str=True):
         info=info,
         # wandb_logger=wandb,
     )
-    # wandb.finish()
+
+    # Kill logger
+    wandb.finish()
 
     # TODO: log output to return
     return 1     
@@ -85,6 +86,7 @@ if __name__ == "__main__":
         dataloader=lambda split, batch_size: get_batch(
             split=split, batch_size=batch_size, block_size=fixed_setting["block_size"],
             train_data=d["train_data"], valid_data=d["valid_data"], 
+            device=fixed_setting["device"]
         )
     ))
 

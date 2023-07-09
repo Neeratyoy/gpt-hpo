@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
-from src.utils import get_acquisition_function
+from src.utils import get_activation_function
 
 
 class Head(nn.Module):
@@ -97,7 +97,7 @@ class FeedForward(nn.Module):
             dropout: float = 0.0
         ):
         super().__init__()
-        self.activation = get_acquisition_function(activation)
+        self.activation = get_activation_function(activation)
         self.dropout = dropout
         self.net = nn.Sequential(
             nn.Linear(embed_size, wide_factor * embed_size),
