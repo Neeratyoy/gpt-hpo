@@ -3,7 +3,6 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 from typing import Union
-import wandb
 
 from src.attention import Block
 from src.lr_schedulers import get_lr_scheduler
@@ -17,9 +16,6 @@ from src.utils import (
     load_config,
     get_optimizer
 )
-
-
-wandb.init(project='char-lm')
 
 
 class CharLM(nn.Module):
@@ -179,6 +175,9 @@ def setup_training(
 
 
 if __name__ == "__main__":
+
+    import wandb
+    wandb.init(project='char-lm')
 
     d = prepare_shakespeare()
 

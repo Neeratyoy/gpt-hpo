@@ -2,8 +2,7 @@
 Defines a training function to take a configuration, train, and return results.
 """
 
-import torch
-# import wandb
+import wandb
 
 from data.data_prep_tinyshakespeare import get_batch, prepare_shakespeare
 from src.char_lm import setup_model, setup_training

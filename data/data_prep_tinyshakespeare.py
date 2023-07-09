@@ -32,7 +32,7 @@ def extract_vocab_and_data(filepath: str) -> List[str]:
 
 
 def create_text_encoder_decoder(vocab) -> Tuple[Callable, Callable]:
-    vocab = np.random.permutation(vocab)
+    vocab = sorted(vocab)
     stoi = {ch: i for i, ch in enumerate(vocab)}
     itos = {i: ch for i, ch in enumerate(vocab)}
 

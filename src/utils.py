@@ -210,7 +210,6 @@ def train_and_evaluate_model(
     return _losses
 
 
-@torch.no_grad()
 def evaluate_model(
     model: nn.Module,
     dataloader: Callable,

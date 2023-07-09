@@ -1,6 +1,5 @@
-max_steps: 1000
-eval_iters: 20
-verbosity_len: 25
+max_steps: 10000
+verbosity_len: 200
 device: null
 seed: 1234
 checkpoint: debug/
