@@ -8,6 +8,7 @@ min_learning_rate: 0
 n_layers: 6
 num_heads: 6
 optimizer_name: adamw
-prenorm: true
 warmup_factor: 0.1
-wide_factor: 1
+wide_factor: 4
+dropout: 0.2
+prenormalize: true

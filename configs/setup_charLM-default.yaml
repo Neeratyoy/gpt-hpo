@@ -1,7 +1,4 @@
 max_steps: 5000
-eval_iters: 200
 verbosity_len: 500
 device: null
 seed: 1337
-
-block_size: 256

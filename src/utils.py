@@ -118,10 +118,8 @@ def train_and_evaluate_model(
     scheduler: torch.optim.lr_scheduler = None,
     max_steps: int = 10000,
     verbosity_len: int = 1000,
-    eval_iters: int = 500,
     plot_loss: str = True,
     info: dict = None,
-    device: str = "cpu",
     **kwargs
 ) -> Dict[str, List[float]]:
     model.train()
@@ -140,7 +138,7 @@ def train_and_evaluate_model(
         lrs = info["lrs"]
 
     # preparing logger
-    wandb_logger = None if "wandb" not in kwargs else wandb
+    # wandb_logger = None if "wandb" not in kwargs else wandb
 
     # setting iteration state
     curr_step = kwargs["curr_step"] if "curr_step" in kwargs else 0
@@ -267,7 +265,7 @@ def load_config(filename):
     if ".yml" not in filename and ".yaml" not in filename:
         filename = filename + ".yaml"
     if "/" not in filename:
-        filename =  os.getcwd() + "/configs/" + filename 
+        filename = os.path.dirname(__file__) + "/../configs/" + filename 
     print("loading from", filename)
     with open(filename, "r") as f:
         config = yaml.safe_load(f)

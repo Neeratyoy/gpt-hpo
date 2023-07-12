@@ -2,7 +2,8 @@
 Defines a training function to take a configuration, train, and return results.
 """
 import time
-import wandb
+import torch
+# import wandb
 
 from data.data_prep_tinyshakespeare import get_batch, prepare_shakespeare
 from src.char_lm import setup_model, setup_training
@@ -35,16 +36,23 @@ def run(setting, verbose: str=True):
         precedence over the `fixed_config` dict values.
     """
     # Setup logger
-    wandb_args = dict(project="lm-hpo")
-    if "log_name" in setting:
-        wandb_args.update(dict(name=setting["log_name"]))
-    wandb.init(**wandb_args, config=setting["config"].copy())
-
+    # wandb_args = dict(project="lm-hpo")
+    # if "log_name" in setting:
+    #     wandb_args.update(dict(name=setting["log_name"]))
+    # wandb.init(**wandb_args, config=setting["config"].copy())
+    
     # Set the seed
-    set_seed(setting["fixed_config"]["seed"]) 
+    try:
+        set_seed(setting["fixed_config"]["seed"]) 
+    except KeyError:
+        try:
+            set_seed(setting["seed"])
+        except KeyError:
+            raise Exception("Cannot find `seed` in setting.")
 
     # Load defaults
-    model, setting = setup_model(**setting)  # setting is now flattened
+    model = setup_model(setting)  # setting is now flattened
+    
     if verbose:
         # Print the number of parameters in the model
         print(setting)
@@ -68,7 +76,7 @@ def run(setting, verbose: str=True):
     runtime = time.time() - start
 
     # Kill logger
-    wandb.finish()
+    # wandb.finish()
 
     result = dict(
         loss=losses["valid"][-1],
@@ -80,31 +88,33 @@ def run(setting, verbose: str=True):
 
 if __name__ == "__main__":
 
+    setting = dict()
+
+    # preprocessing data
     d = prepare_shakespeare()
+    setting.update(dict(vocab_size=d["vocab_size"]))
 
     name = "charLM-test.yaml"
-    fixed_setting = exp_setup(f"setup_{name}")
+    training_setting = load_config(f"setup_{name}")
+    default_setting = load_config(name)
+
+    # flattening setting dict
+    setting.update(training_setting)
+    setting.update(default_setting)
+    setting.update(dict(device="cuda" if torch.cuda.is_available() else "cpu"))
 
     # adding dataloader as part of experiment setup
-    fixed_setting.update(dict(
-        vocab_size=d["vocab_size"], 
+    setting.update(dict(
         dataloader=lambda split, batch_size: get_batch(
-            split=split, batch_size=batch_size, block_size=fixed_setting["block_size"],
+            split=split, batch_size=batch_size, block_size=setting["block_size"],
             train_data=d["train_data"], valid_data=d["valid_data"], 
-            device=fixed_setting["device"]
+            device=setting["device"]
         )
     ))
 
-    config = load_config(name)
-    fixed_setting["log_name"] = name
-
-    setting = dict()
-    setting.update(dict(
-        config=config.copy(),
-        fixed_config=fixed_setting,   # important step 
-        
-    ))
+    # adding log name
+    setting.update(dict(log_name=name))
+    
     print("Running an evaluation...")
-
     run(setting, verbose=True)
 # end of file

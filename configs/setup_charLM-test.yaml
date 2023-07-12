@@ -3,5 +3,3 @@ verbosity_len: 50
 device: null
 seed: 1234
 checkpoint: debug/
-
-block_size: 32

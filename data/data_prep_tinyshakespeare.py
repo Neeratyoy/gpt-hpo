@@ -125,7 +125,8 @@ def prepare_shakespeare(train_size=0.9, input_path="data/tinyshakespeare/input.t
         train_data=train_data,
         valid_data=valid_data,
         encode=encode,
-        decode=decode
+        decode=decode,
+        get_batch=get_batch,
     )
     return shakespeare
 

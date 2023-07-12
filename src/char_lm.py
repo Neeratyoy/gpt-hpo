@@ -41,7 +41,7 @@ class CharLM(nn.Module):
         # each token directly reads off the logits for the next
         # token from a lookup table
         # Note attention does not have any notion of colocation
-        # of characters/words and this is important for lms
+        # of characters/words and this is important for LMs
         self.token_embedding_table = nn.Embedding(vocab_size, embed_size, device=self.device)
         self.position_embedding_table = nn.Embedding(block_size, embed_size, device=self.device)
         self.blocks = nn.Sequential(
@@ -114,34 +114,23 @@ class CharLM(nn.Module):
 
 
 def setup_model(
-    config: Union[str, dict]=None, fixed_config: dict=None, **kwargs
+    setting: dict
+    # config: Union[str, dict]=None, fixed_config: dict=None, **kwargs
 ) -> tuple([nn.Module, dict]):
     """ Instantiates the model as per arguments passed.
     """
-    if config is None or isinstance(config, str):
-        default_setting = load_config(config_name)
-    elif isinstance(config, dict):
-        default_setting = config.copy()
-    else:
-        raise ValueError("config needs to be a str or a dict!") 
-
-    # important step such that the fixed setting always overrides any duplicate HPs
-    if fixed_config is not None:
-        default_setting.update(fixed_config)
-    assert "vocab_size" in default_setting
-
-    model = CharLM(**default_setting)
-    if "device" not in default_setting or default_setting["device"] is None:
+    model = CharLM(**setting)
+    if "device" not in setting or setting["device"] is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        default_setting["device"] = device
-    model = model.to(default_setting["device"])
+        setting["device"] = device
+    model = model.to(setting["device"])
 
-    return model, default_setting
+    return model
 
 
 def setup_training(
     model: nn.Module, checkpoint=None, **kwargs
-):
+) -> tuple([torch.optim.Optimizer, torch.optim.lr_scheduler, int, dict]):
     # initialize the optimizer
     optimizer = get_optimizer(
         kwargs["optimizer_name"], model.parameters(), kwargs["learning_rate"]
@@ -155,18 +144,16 @@ def setup_training(
         warmup_factor=None if "warmup_factor" not in kwargs else kwargs["warmup_factor"],
         step_size=None if "step_size" not in kwargs else kwargs["step_size"],
         gamma=None if "gamma" not in kwargs else kwargs["gamma"],
-        last_epoch=-1,  # TODO: load from checkpoint 
+        last_epoch=-1,
         T_mult=1 if "T_mult" not in kwargs else kwargs["T_mult"]
     )
     scheduler = get_lr_scheduler(
         optimizer,
         **scheduler_args
     )
-    # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-    #     optimizer, scheduler_args["max_steps"]
-    # )
 
     # loading checkpoints if available
+    info = None
     current_step = 0
     if checkpoint is not None and isinstance(checkpoint, str):
         current_step, info = load_checkpoint(checkpoint, model, optimizer, scheduler)

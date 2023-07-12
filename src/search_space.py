@@ -1,53 +1,75 @@
 from ConfigSpace import Categorical, ConfigurationSpace, Constant, Float, Integer
 
 
-def charLM_space_CS(seed: int=1234) -> ConfigurationSpace: 
-    # HPs that instantiate a model architecture primarily
-    model_hps = {
-        "block_size": Integer("block_size", bounds=(32, 512), default=256, log=True),
-        "embed_size": Integer("embed_size", bounds=(32, 512), default=384, log=True),
-        "num_heads": Integer("num_heads", bounds=(1, 16), default=6),      
-        "n_layers": Integer("n_layers", bounds=(1, 16), default=6),                            
-        "wide_factor": Integer("wide_factor", bounds=(1, 5), default=2),                   
-        "activation": Categorical(
-            "activation", 
-            ["gelu", "relu", "tanh", "sigmoid", "softplus", "swish", "silu"],
-            default="relu"
-        ),                
-        "prenorm": Categorical(
-            "prenorm", 
-            [True, False],
-            default=True
-        ),
-        # TODO: add regularizers
-    }
+def get_charLM_space_small(seed: int=1234, defaults: dict=None) -> ConfigurationSpace:
+    """Returns a ConfigurationSpace object for the charLM-small benchmark."""
     # HPs that define the training pipeline for the model
     training_hps = {
-        "batch_size": Integer("batch_size", bounds=(32, 2048), log=True, default=64),
-        "learning_rate": Float("learning_rate", bounds=(1e-6, 1), log=True, default=1e-3),
-        # TODO: enforce min LR to be 0 if greater than LR
-        "min_learning_rate": Float("min_learning_rate", bounds=(1e-20, 1e-2), log=True, default=1e-6),
-        "optimizer_name": Categorical(
-            "optimizer_name", ["sgd", "adam", "adafactor"], default="adam"
+        "learning_rate": Float(
+            "learning_rate", 
+            bounds=(1e-6, 1e-2), 
+            log=True, 
+            default=None if (defaults is None or "learning_rate" not in defaults) else defaults["learning_rate"]
         ),
-        "lr_schedule": Categorical(
-            "lr_schedule", ["step", "cosine", "constant"], default="cosine"
+        "warmup_factor": Float(
+            "warmup_factor", 
+            bounds=(0, 0.25), 
+            default=None if (defaults is None or "warmup_factor" not in defaults) else defaults["warmup_factor"]
         ),
-        "warmup_factor": Float("warmup_factor", bounds=(0, 0.25), default=0.1),
+        "dropout": Float(
+            "dropout", 
+            bounds=(0.05, 0.5),
+            default=None if (defaults is None or "dropout" not in defaults) else defaults["dropout"]
+        ),
     }
-
-    cs = ConfigurationSpace(seed=seed, space={**model_hps, **training_hps})
+    cs = ConfigurationSpace(seed=seed, space=training_hps)
     return cs
 
 
-def get_experiment_params(vocab_size):
-    # these HPs are task or pipeline dependent but affect the model and its training
-    # at runtime, these HPs can be fixed with a preset dict before actual training
-    exp_hps = {
-        "vocab_size": Constant("vocab_size", vocab_size),
-        "train_steps": Integer("train_steps", bounds=(1, 1000000)),
-        "valid_steps": Integer("valid_steps", bounds=(1, 1000000)),
-        "eval_freq": Integer("eval_step_factor", bounds=(0, 1)),
-        "device": Categorical("device", ["cpu", "cuda"], default="cpu")
+def get_charLM_space_large(seed: int=1234, defaults: dict=None) -> ConfigurationSpace:
+    """Returns a ConfigurationSpace object for the charLM-large benchmark."""
+    # HPs that instantiate a model architecture primarily
+    model_hps = {             
+        "embed_size": Integer(
+            "embed_size", 
+            bounds=(32, 512), 
+            default=None if (defaults is None or "embed_size" not in defaults) else defaults["embed_size"], 
+            log=True
+        ),
+        "wide_factor": Integer(
+            "wide_factor", 
+            bounds=(1, 5), 
+            default=None if (defaults is None or "wide_factor" not in defaults) else defaults["wide_factor"]
+        ),
+        "num_heads": Integer(
+            "num_heads", 
+            bounds=(2, 16), 
+            default=None if (defaults is None or "num_heads" not in defaults) else defaults["num_heads"]
+        ),      
+        "activation": Categorical(
+            "activation", 
+            ["gelu", "relu",  "swish"],  # "tanh", "sigmoid", "softplus", "silu"
+            default=None if (defaults is None or "activation" not in defaults) else defaults["activation"]
+        )
+    }         
+    # HPs that define the training pipeline for the model
+    training_hps = {
+        "learning_rate": Float(
+            "learning_rate", 
+            bounds=(1e-6, 1e-2), 
+            log=True, 
+            default=None if (defaults is None or "learning_rate" not in defaults) else defaults["learning_rate"]
+        ),
+        "warmup_factor": Float(
+            "warmup_factor", 
+            bounds=(0, 0.25), 
+            default=None if (defaults is None or "warmup_factor" not in defaults) else defaults["warmup_factor"]
+        ),
+        "dropout": Float(
+            "dropout", 
+            bounds=(0.05, 0.5),
+            default=None if (defaults is None or "dropout" not in defaults) else defaults["dropout"]
+        ),
     }
-    return ConfigurationSpace(exp_hps)
+    cs = ConfigurationSpace(seed=seed, space={**model_hps, **training_hps})
+    return cs
