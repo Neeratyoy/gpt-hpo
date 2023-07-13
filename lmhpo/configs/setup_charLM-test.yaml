@@ -1,0 +1,5 @@
+max_steps: 500
+verbosity_len: 50
+device: null
+seed: 1234
+checkpoint: debug/
