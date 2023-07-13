@@ -1,6 +1,5 @@
 torch
 datasets
-tiktoken
 tqdm
 matplotlib
 ConfigSpace
