@@ -12,6 +12,8 @@ from tqdm import tqdm
 from typing import List, Tuple, Callable, Dict
 import yaml
 
+from lmhpo.src.lr_schedulers import get_lr_scheduler
+
 
 class Swish(nn.Module):
     # https://arxiv.org/abs/1710.05941v2
@@ -117,6 +119,7 @@ def train_and_evaluate_model(
     optimizer: torch.optim = None,
     scheduler: torch.optim.lr_scheduler = None,
     max_steps: int = 10000,
+    training_steps: int = None,
     verbosity_len: int = 1000,
     plot_loss: str = True,
     info: dict = None,
@@ -142,9 +145,10 @@ def train_and_evaluate_model(
 
     # setting iteration state
     curr_step = kwargs["curr_step"] if "curr_step" in kwargs else 0
+    training_steps = max_steps if training_steps is None else min(training_steps, max_steps)
 
     # training loop
-    for iter in tqdm(range(curr_step, max_steps)):
+    for iter in tqdm(range(curr_step, training_steps)):
 
         # sample a batch of data
         split = "train"
@@ -166,7 +170,7 @@ def train_and_evaluate_model(
         valid_losses.append(valid_losses[-1])
 
         # evaluate the loss on train and val sets every `verbosity_len` steps
-        if (iter + 1) % verbosity_len == 0 or iter == max_steps - 1:
+        if (iter + 1) % verbosity_len == 0 or iter == training_steps - 1:
             model.eval()    
             valid_loss = evaluate_model(model, dataloader)
             valid_losses[-1] = valid_loss
@@ -175,9 +179,9 @@ def train_and_evaluate_model(
             print(
                 f"step {iter}: train loss={_train:.4f}, val loss={_valid:.4f}"
             )
-            if "checkpoint" in kwargs and kwargs["checkpoint"] is not None:
+            if "save_path" in kwargs and kwargs["save_path"] is not None:
                 save_checkpoint(
-                    path=Path(os.getcwd()) / kwargs["checkpoint"],
+                    path=Path(kwargs["save_path"]),
                     model=model,
                     optimizer=optimizer,
                     lr_scheduler=scheduler,
@@ -199,7 +203,13 @@ def train_and_evaluate_model(
             })
 
     if plot_loss:
-        plot_losses(train_losses, "temp.png", valid_losses, lrs, smooth=True)
+        plot_losses(
+            train_losses, 
+            os.path.join(os.path.dirname(kwargs["save_path"]), "summary.png"), 
+            valid_losses, 
+            lrs, 
+            smooth=True
+        )
     _losses = {
         "train": train_losses,
         "valid": valid_losses,
@@ -293,6 +303,40 @@ def set_seed(seed):
     torch.backends.cudnn.benchmark = False
 
 
+def setup_training(
+    model: nn.Module, load_path: str=None, **kwargs
+) -> tuple([torch.optim.Optimizer, torch.optim.lr_scheduler, int, dict]):
+    # initialize the optimizer
+    optimizer = get_optimizer(
+        kwargs["optimizer_name"], model.parameters(), kwargs["learning_rate"]
+    )
+    # setup the LR scheduler
+    #TODO: account for different scheduler settings, right now, only Cosine Annealing
+    scheduler_args = dict(
+        scheduler_name=None if "lr_schedule" not in kwargs else kwargs["lr_schedule"],
+        min_lr=None if "min_learning_rate" not in kwargs else kwargs["min_learning_rate"],
+        max_steps=None if "max_steps" not in kwargs else kwargs["max_steps"],
+        warmup_factor=None if "warmup_factor" not in kwargs else kwargs["warmup_factor"],
+        step_size=None if "step_size" not in kwargs else kwargs["step_size"],
+        gamma=None if "gamma" not in kwargs else kwargs["gamma"],
+        last_epoch=-1,
+        T_mult=1 if "T_mult" not in kwargs else kwargs["T_mult"]
+    )
+    scheduler = get_lr_scheduler(
+        optimizer,
+        **scheduler_args
+    )
+
+    # loading checkpoints if available
+    info = None
+    current_step = 0
+    if load_path is not None and isinstance(load_path, (str, Path)):
+        current_step, info = load_checkpoint(load_path, model, optimizer, scheduler)
+        print(f"Loaded checkpoint at {current_step}")
+
+    return optimizer, scheduler, current_step, info
+
+
 def log_weight_statistics(model):
     for i, (name, param) in enumerate(model.named_parameters()):
         print(f"{name}: mean={param.data.mean():.6f}, std={param.data.std():.6f}")
@@ -313,7 +357,7 @@ def save_checkpoint(
     ) -> None:
     """ Saves the model weights and state of the training pipeline.
     """
-    path = Path(path) / "checkpoints.pt"
+    path = Path(path) / "checkpoints.pt" if ".pt" not in str(path) else path
     checkpoint = {
         'steps': steps,
         'model_state_dict': model.state_dict(),
@@ -338,7 +382,7 @@ def load_checkpoint(
     ) -> Tuple[int, dict]:
     """ Loads the model weights and state of the training pipeline.
     """
-    path = Path(path) / "checkpoints.pt"
+    path = Path(path) / "checkpoints.pt" if ".pt" not in str(path) else path
     if not os.path.isfile(path):
         print(f"Checkpoint file not found at {path}")
         return 0, None
@@ -360,7 +404,6 @@ def load_checkpoint(
     torch.cuda.set_rng_state_all(checkpoint['cuda_rng_state'])
     random.setstate(checkpoint['random_rng_state'])
     np.random.set_state(checkpoint['numpy_rng_state'])
-
     return steps, info
 
 
@@ -372,31 +415,3 @@ def exp_setup(setup_args: str=None):
     if "device" not in setup_args or setup_args["device"] is None:
         setup_args["device"] = "cuda" if torch.cuda.is_available() else "cpu"
     return setup_args
-
-
-# TODO: verify this Bing AI solution
-# import torch
-# from torch.utils.data import DataLoader, Dataset
-
-# class TextDataset(Dataset):
-#     def __init__(self, data):
-#         self.data = data
-
-#     def __len__(self):
-#         return len(self.data)
-
-#     def __getitem__(self, idx):
-#         return self.data[idx]
-
-# def create_data_loader(data, batch_size, shuffle):
-#     # create a dataset from the data
-#     dataset = TextDataset(data)
-
-#     # create a data loader from the dataset
-#     data_loader = DataLoader(
-#         dataset,
-#         batch_size=batch_size,
-#         shuffle=shuffle
-#     )
-
-#     return data_loader

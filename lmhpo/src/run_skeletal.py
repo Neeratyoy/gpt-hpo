@@ -6,11 +6,12 @@ import torch
 # import wandb
 
 from lmhpo.data.data_prep_tinyshakespeare import get_batch, prepare_shakespeare
-from lmhpo.src.char_lm import setup_model, setup_training
+from lmhpo.src.char_lm import setup_model
 from lmhpo.src.utils import (
     count_trainable_params, 
     load_config, 
     set_seed, 
+    setup_training,
     train_and_evaluate_model, 
     evaluate_model, 
     exp_setup,
@@ -40,7 +41,7 @@ def run(setting, verbose: str=True):
     # if "log_name" in setting:
     #     wandb_args.update(dict(name=setting["log_name"]))
     # wandb.init(**wandb_args, config=setting["config"].copy())
-    
+
     # Set the seed
     try:
         set_seed(setting["fixed_config"]["seed"]) 
@@ -91,7 +92,7 @@ if __name__ == "__main__":
     setting = dict()
 
     # preprocessing data
-    d = prepare_shakespeare()
+    d = prepare_shakespeare(input_path="./lmhpo/data/tinyshakespeare/input.txt")
     setting.update(dict(vocab_size=d["vocab_size"]))
 
     name = "charLM-test.yaml"
@@ -114,6 +115,10 @@ if __name__ == "__main__":
 
     # adding log name
     setting.update(dict(log_name=name))
+
+    # checkpoints
+    setting.update({"load_path": "./debug"})
+    setting.update({"save_path": "./debug"})
     
     print("Running an evaluation...")
     run(setting, verbose=True)

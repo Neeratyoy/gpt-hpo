@@ -11,9 +11,14 @@ def get_charLM_space_small(seed: int=1234, defaults: dict=None) -> Configuration
             log=True, 
             default=None if (defaults is None or "learning_rate" not in defaults) else defaults["learning_rate"]
         ),
-        "warmup_factor": Float(
+        # "warmup_factor": Float(  # TODO: make cateforical as percentage
+        #     "warmup_factor", 
+        #     bounds=(0, 0.25), 
+        #     default=None if (defaults is None or "warmup_factor" not in defaults) else defaults["warmup_factor"]
+        # ),
+        "warmup_factor": Integer(  # TODO: make cateforical as percentage
             "warmup_factor", 
-            bounds=(0, 0.25), 
+            bounds=(0, 5), 
             default=None if (defaults is None or "warmup_factor" not in defaults) else defaults["warmup_factor"]
         ),
         "dropout": Float(
@@ -60,9 +65,14 @@ def get_charLM_space_large(seed: int=1234, defaults: dict=None) -> Configuration
             log=True, 
             default=None if (defaults is None or "learning_rate" not in defaults) else defaults["learning_rate"]
         ),
-        "warmup_factor": Float(
+        # "warmup_factor": Float(  # TODO: make cateforical as percentage
+        #     "warmup_factor", 
+        #     bounds=(0, 0.25), 
+        #     default=None if (defaults is None or "warmup_factor" not in defaults) else defaults["warmup_factor"]
+        # ),
+        "warmup_factor": Integer(  # TODO: make cateforical as percentage
             "warmup_factor", 
-            bounds=(0, 0.25), 
+            bounds=(0, 5), 
             default=None if (defaults is None or "warmup_factor" not in defaults) else defaults["warmup_factor"]
         ),
         "dropout": Float(

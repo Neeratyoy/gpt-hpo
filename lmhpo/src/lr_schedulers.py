@@ -122,16 +122,17 @@ def exp_decay_scheduler(optimizer, warmup_steps, gamma, last_epoch=-1):
 
 
 def get_lr_scheduler(
-        optimizer, 
-        scheduler_name, 
-        min_lr, 
-        max_steps, 
-        warmup_factor,
-        step_size=None,
-        gamma=None,
-        last_epoch=-1, 
-        T_mult=1
+        optimizer: torch.optim, 
+        scheduler_name: str, 
+        min_lr: float, 
+        max_steps: int, 
+        warmup_factor: int,
+        step_size: int=None,
+        gamma: int=None,
+        last_epoch: int=-1, 
+        T_mult: int=1
     ):
+    warmup_factor /= 10  # search space contains the percentages, e.g. 0, 10, ..., 40, 50
     if scheduler_name == 'constant':
         sch = constant_scheduler(optimizer, min_lr)
     elif scheduler_name == 'cosine':

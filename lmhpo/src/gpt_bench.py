@@ -86,11 +86,21 @@ class CharLMBench:
         ss = search_space[bench_size]
         return ss
 
-    def query(self, config, checkpoint: Union[str, Path]=None) -> dict:
+    def query(
+        self, 
+        config, 
+        load_path: Union[str, Path]=None, 
+        save_path: Union[str, Path]=None, 
+        setting: dict=None
+    ) -> dict:
         # update the setting with the current config, overwriting the defaults
-        _setting = self.setting.copy()
+        # this allows an option to update other aspects of the training other than the 
+        # config passed (i.e., the search space aside all parameters can be updated)
+        # fidelity parameters that are NOT part of the search space can be update here
+        # can thus updated multiple parameters including architecture, batch size, etc.
+        _setting = self.setting.copy() if setting is None else setting.copy()
         _setting.update(config)
-
+        
         # create dataloader 
         dataloader = lambda split, batch_size: self.shakespeare["get_batch"](
             split=split, 
@@ -104,7 +114,10 @@ class CharLMBench:
         _setting.update({"vocab_size": self.shakespeare["vocab_size"]})
 
         # updating possible checkpoint
-        _setting.update({"checkpoint": checkpoint})
+        if load_path is not None:
+            _setting.update({"load_path": load_path})
+        if save_path is not None:
+            _setting.update({"save_path": save_path})
         # run the evaluation
         result = run(_setting, verbose=True)
 
@@ -127,6 +140,18 @@ if __name__ == "__main__":
     config = search_space.sample_configuration()
     print(config)
     print()
-    res = bench.query(config, checkpoint="debug/")
+
+    # demonstrating how settinig can be overriden during a call to the benchmark
+    _setting = None
+    _setting = bench.setting.copy()
+    _setting.update(dict(
+        load_path="./debug",
+        save_path="./debug"
+    ))
+
+    res = bench.query(
+        config, 
+        setting=_setting
+    )
     print(res.keys())
     print(f"Loss: {res['loss']:.4f}; Cost: {res['cost']:.4f}")

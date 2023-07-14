@@ -5,7 +5,6 @@ from torch.nn import functional as F
 from typing import Union
 
 from lmhpo.src.attention import Block
-from lmhpo.src.lr_schedulers import get_lr_scheduler
 from lmhpo.src.utils import (
     train_and_evaluate_model, 
     estimate_loss, 
@@ -85,7 +84,7 @@ class CharLM(nn.Module):
             B, T, C = logits.shape
             logits = logits.view(B * T, C)
             targets = targets.view(B * T)
-            loss = F.cross_entropy(logits, targets)
+            loss = F.cross_entropy(logits, targets)  # loss function, could be an argument
 
         return logits, loss
 
@@ -126,40 +125,6 @@ def setup_model(
     model = model.to(setting["device"])
 
     return model
-
-
-def setup_training(
-    model: nn.Module, checkpoint=None, **kwargs
-) -> tuple([torch.optim.Optimizer, torch.optim.lr_scheduler, int, dict]):
-    # initialize the optimizer
-    optimizer = get_optimizer(
-        kwargs["optimizer_name"], model.parameters(), kwargs["learning_rate"]
-    )
-    # setup the LR scheduler
-    #TODO: account for different scheduler settings, right now, only Cosine Annealing
-    scheduler_args = dict(
-        scheduler_name=None if "lr_schedule" not in kwargs else kwargs["lr_schedule"],
-        min_lr=None if "min_learning_rate" not in kwargs else kwargs["min_learning_rate"],
-        max_steps=None if "max_steps" not in kwargs else kwargs["max_steps"],
-        warmup_factor=None if "warmup_factor" not in kwargs else kwargs["warmup_factor"],
-        step_size=None if "step_size" not in kwargs else kwargs["step_size"],
-        gamma=None if "gamma" not in kwargs else kwargs["gamma"],
-        last_epoch=-1,
-        T_mult=1 if "T_mult" not in kwargs else kwargs["T_mult"]
-    )
-    scheduler = get_lr_scheduler(
-        optimizer,
-        **scheduler_args
-    )
-
-    # loading checkpoints if available
-    info = None
-    current_step = 0
-    if checkpoint is not None and isinstance(checkpoint, str):
-        current_step, info = load_checkpoint(checkpoint, model, optimizer, scheduler)
-        print(f"Loaded checkpoint at {current_step}")
-
-    return optimizer, scheduler, current_step, info
 
 
 if __name__ == "__main__":
