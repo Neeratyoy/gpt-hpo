@@ -1,6 +1,7 @@
 """
 Defines a training function to take a configuration, train, and return results.
 """
+from pathlib import Path
 import time
 import torch
 # import wandb
@@ -44,12 +45,9 @@ def run(setting, verbose: str=True):
 
     # Set the seed
     try:
-        set_seed(setting["fixed_config"]["seed"]) 
+        set_seed(setting["seed"])
     except KeyError:
-        try:
-            set_seed(setting["seed"])
-        except KeyError:
-            raise Exception("Cannot find `seed` in setting.")
+        raise Exception("Cannot find `seed` in setting.")
 
     # Load defaults
     model = setup_model(setting)  # setting is now flattened
@@ -91,8 +89,9 @@ if __name__ == "__main__":
 
     setting = dict()
 
+    base_path = Path(__file__).resolve().parent
     # preprocessing data
-    d = prepare_shakespeare(input_path="./lmhpo/data/tinyshakespeare/input.txt")
+    d = prepare_shakespeare(input_path=base_path / "../data/tinyshakespeare/input.txt")
     setting.update(dict(vocab_size=d["vocab_size"]))
 
     name = "charLM-test.yaml"
@@ -117,8 +116,8 @@ if __name__ == "__main__":
     setting.update(dict(log_name=name))
 
     # checkpoints
-    setting.update({"load_path": "./debug"})
-    setting.update({"save_path": "./debug"})
+    setting.update({"load_path": base_path / "../../debug"})
+    setting.update({"save_path": base_path / "../../debug"})
     
     print("Running an evaluation...")
     run(setting, verbose=True)
