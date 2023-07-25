@@ -70,9 +70,24 @@ def plot_losses(losses, filepath, val_losses=None, lrs=None, smooth=True):
     plt.savefig(filepath, dpi=300);
 
 
-def count_trainable_params(model):
+def count_trainable_params(model) -> float:
     """Count the number of trainable parameters in a PyTorch model."""
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+
+def get_model_size(model) -> float:
+    """Get the size of a PyTorch model in GBs."""
+    # Get the total number of elements in the model's parameters
+    num_elements = sum(p.numel() for p in model.parameters())
+
+    # Get the size of each element in bytes
+    element_size = model.parameters().__next__().element_size()
+
+    # Calculate the size of the model in bytes
+    model_size = num_elements * element_size
+    model_size_gb = model_size / (1024 ** 3)
+
+    return model_size_gb
 
 
 # TODO: verify this ChatGPT solution
@@ -144,7 +159,7 @@ def train_and_evaluate_model(
     # wandb_logger = None if "wandb" not in kwargs else wandb
 
     # setting iteration state
-    curr_step = kwargs["curr_step"] if "curr_step" in kwargs else 0
+    curr_step = kwargs["curr_step"] + 1 if "curr_step" in kwargs else 0
     training_steps = max_steps if training_steps is None else min(training_steps, max_steps)
 
     # training loop

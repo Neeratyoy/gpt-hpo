@@ -11,19 +11,14 @@ def get_charLM_space_small(seed: int=1234, defaults: dict=None) -> Configuration
             log=True, 
             default=None if (defaults is None or "learning_rate" not in defaults) else defaults["learning_rate"]
         ),
-        # "warmup_factor": Float(  # TODO: make cateforical as percentage
-        #     "warmup_factor", 
-        #     bounds=(0, 0.25), 
-        #     default=None if (defaults is None or "warmup_factor" not in defaults) else defaults["warmup_factor"]
-        # ),
-        "warmup_factor": Integer(  # TODO: make cateforical as percentage
+        "warmup_factor": Integer(
             "warmup_factor", 
-            bounds=(0, 5), 
+            bounds=(0, 5),  # means 0% to 50% of training steps
             default=None if (defaults is None or "warmup_factor" not in defaults) else defaults["warmup_factor"]
         ),
         "dropout": Float(
             "dropout", 
-            bounds=(0.05, 0.5),
+            bounds=(0.05, 0.3),
             default=None if (defaults is None or "dropout" not in defaults) else defaults["dropout"]
         ),
     }
@@ -37,7 +32,7 @@ def get_charLM_space_large(seed: int=1234, defaults: dict=None) -> Configuration
     model_hps = {             
         "embed_size": Integer(
             "embed_size", 
-            bounds=(32, 512), 
+            bounds=(64, 512), 
             default=None if (defaults is None or "embed_size" not in defaults) else defaults["embed_size"], 
             log=True
         ),
@@ -48,7 +43,7 @@ def get_charLM_space_large(seed: int=1234, defaults: dict=None) -> Configuration
         ),
         "num_heads": Integer(
             "num_heads", 
-            bounds=(2, 16), 
+            bounds=(4, 16), 
             default=None if (defaults is None or "num_heads" not in defaults) else defaults["num_heads"]
         ),      
         "activation": Categorical(
@@ -65,19 +60,14 @@ def get_charLM_space_large(seed: int=1234, defaults: dict=None) -> Configuration
             log=True, 
             default=None if (defaults is None or "learning_rate" not in defaults) else defaults["learning_rate"]
         ),
-        # "warmup_factor": Float(  # TODO: make cateforical as percentage
-        #     "warmup_factor", 
-        #     bounds=(0, 0.25), 
-        #     default=None if (defaults is None or "warmup_factor" not in defaults) else defaults["warmup_factor"]
-        # ),
-        "warmup_factor": Integer(  # TODO: make cateforical as percentage
+        "warmup_factor": Integer(
             "warmup_factor", 
-            bounds=(0, 5), 
+            bounds=(0, 5),  # means 0% to 50% of training steps
             default=None if (defaults is None or "warmup_factor" not in defaults) else defaults["warmup_factor"]
         ),
         "dropout": Float(
             "dropout", 
-            bounds=(0.05, 0.5),
+            bounds=(0.05, 0.3),
             default=None if (defaults is None or "dropout" not in defaults) else defaults["dropout"]
         ),
     }

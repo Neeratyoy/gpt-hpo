@@ -10,6 +10,7 @@ from lmhpo.data.data_prep_tinyshakespeare import get_batch, prepare_shakespeare
 from lmhpo.src.char_lm import setup_model
 from lmhpo.src.utils import (
     count_trainable_params, 
+    get_model_size,
     load_config, 
     set_seed, 
     setup_training,
@@ -49,39 +50,60 @@ def run(setting, verbose: str=True):
     except KeyError:
         raise Exception("Cannot find `seed` in setting.")
 
-    # Load defaults
-    model = setup_model(setting)  # setting is now flattened
-    
-    if verbose:
-        # Print the number of parameters in the model
-        print(setting)
-        print(count_trainable_params(model)/1e6, 'M parameters')
+    try:
+        # the try-block exists to not make the code block throw an error if the training 
+        # pipeline created does not hold in GOU memory and to catch it appropriately to 
+        # indicate a failed run
 
-    # Training setup
-    optimizer, scheduler, curr_step, info = setup_training(model, **setting)
+        # Load defaults
+        model = setup_model(setting)  # setting is now flattened
+        
+        if verbose:
+            # Print the number of parameters in the model
+            print(setting)
+            print(count_trainable_params(model)/1e6, 'M parameters')
+            print(get_model_size(model), 'GB in memory')
 
-    # Training model
-    start = time.time()
-    losses = train_and_evaluate_model(
-        model=model,
-        **setting,
-        optimizer=optimizer,
-        scheduler=scheduler,
-        curr_step=curr_step,
-        plot_loss=True,
-        info=info,
-        # wandb_logger=wandb,
-    )
-    runtime = time.time() - start
+        # Training setup
+        optimizer, scheduler, curr_step, info = setup_training(model, **setting)
+
+        # Training model
+        start = time.time()
+        losses = train_and_evaluate_model(
+            model=model,
+            **setting,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            curr_step=curr_step,
+            plot_loss=True,
+            info=info,
+            # wandb_logger=wandb,
+        )
+        runtime = time.time() - start
+
+        # Preparing result
+        result = dict(
+            loss=losses["valid"][-1],
+            cost=runtime,
+        )
+        result.update(losses)
+
+    except RuntimeError as e:
+        if 'CUDA out of memory' in str(e):
+            print('CUDA out of memory error:', e)
+            result = dict(
+                loss=float("inf"),  # maximal loss 
+                cost=0,       # minimal runtime cost
+                info=str(e)
+            )
+        else:
+            # Handle other runtime errors
+            raise e
 
     # Kill logger
     # wandb.finish()
 
-    result = dict(
-        loss=losses["valid"][-1],
-        cost=runtime,
-    )
-    result.update(losses)
+    
     return result
 
 
@@ -120,5 +142,7 @@ if __name__ == "__main__":
     setting.update({"save_path": base_path / "../../debug"})
     
     print("Running an evaluation...")
-    run(setting, verbose=True)
+    result = run(setting, verbose=True)
+
+    print("Result:\n", result)
 # end of file
