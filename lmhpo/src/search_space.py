@@ -18,7 +18,7 @@ def get_charLM_space_small(seed: int=1234, defaults: dict=None) -> Configuration
         ),
         "dropout": Float(
             "dropout", 
-            bounds=(0.05, 0.3),
+            bounds=(0.01, 0.35),
             default=None if (defaults is None or "dropout" not in defaults) else defaults["dropout"]
         ),
     }
@@ -67,7 +67,7 @@ def get_charLM_space_large(seed: int=1234, defaults: dict=None) -> Configuration
         ),
         "dropout": Float(
             "dropout", 
-            bounds=(0.05, 0.3),
+            bounds=(0.01, 0.35),
             default=None if (defaults is None or "dropout" not in defaults) else defaults["dropout"]
         ),
     }
