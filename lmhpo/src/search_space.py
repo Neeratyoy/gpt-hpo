@@ -13,7 +13,7 @@ def get_charLM_space_small(seed: int=1234, defaults: dict=None) -> Configuration
         ),
         "warmup_factor": Integer(
             "warmup_factor", 
-            bounds=(0, 5),  # means 0% to 50% of training steps
+            bounds=(0, 3),  # means 0% to 50% of training steps
             default=None if (defaults is None or "warmup_factor" not in defaults) else defaults["warmup_factor"]
         ),
         "dropout": Float(
@@ -62,7 +62,7 @@ def get_charLM_space_large(seed: int=1234, defaults: dict=None) -> Configuration
         ),
         "warmup_factor": Integer(
             "warmup_factor", 
-            bounds=(0, 5),  # means 0% to 50% of training steps
+            bounds=(0, 3),  # means 0% to 50% of training steps
             default=None if (defaults is None or "warmup_factor" not in defaults) else defaults["warmup_factor"]
         ),
         "dropout": Float(

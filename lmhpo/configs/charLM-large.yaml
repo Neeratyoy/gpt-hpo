@@ -8,7 +8,7 @@ min_learning_rate: 0
 n_layers: 12  # changed from the default
 num_heads: 12  # changed from the default
 optimizer_name: adamw
-warmup_factor: 0.1  # changed from the default
+warmup_factor: 1  # changed from the default (=10%)
 wide_factor: 4
 dropout: 0.1  # changed from the default
 prenormalize: true

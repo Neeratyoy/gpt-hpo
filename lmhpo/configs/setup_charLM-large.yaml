@@ -1,4 +1,4 @@
-max_steps: 10000
-verbosity_len: 300
+max_steps: 5000
+verbosity_len: 100
 device: null
 seed: 1337
