@@ -69,7 +69,7 @@ def run(setting, verbose: str=True):
         optimizer, scheduler, curr_step, info = setup_training(model, **setting)
 
         # Training model
-        start = time.time()
+        start_time = time.time()
         losses = train_and_evaluate_model(
             model=model,
             **setting,
@@ -80,12 +80,15 @@ def run(setting, verbose: str=True):
             info=info,
             # wandb_logger=wandb,
         )
-        runtime = time.time() - start
+        end_time = time.time()
+        runtime = end_time - start_time
 
         # Preparing result
         result = dict(
             loss=losses["valid"][-1],
             cost=runtime,
+            start_time=start_time,
+            end_time=end_time,
         )
         result.update(losses)
         result.update(dict(worker_id=os.getpid()))
