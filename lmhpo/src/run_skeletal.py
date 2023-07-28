@@ -91,7 +91,10 @@ def run(setting, verbose: str=True):
             end_time=end_time,
         )
         result.update(losses)
-        result.update(dict(worker_id=os.getpid()))
+        result.update(dict(
+            process_id=os.getpid(),
+            fidelity=setting["training_steps"],
+        ))
 
     except RuntimeError as e:
         if 'CUDA out of memory' in str(e):
