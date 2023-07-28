@@ -1,6 +1,7 @@
 """
 Defines a training function to take a configuration, train, and return results.
 """
+import os
 from pathlib import Path
 import time
 import torch
@@ -87,6 +88,7 @@ def run(setting, verbose: str=True):
             cost=runtime,
         )
         result.update(losses)
+        result.update(dict(worker_id=os.getpid()))
 
     except RuntimeError as e:
         if 'CUDA out of memory' in str(e):

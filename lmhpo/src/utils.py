@@ -162,6 +162,9 @@ def train_and_evaluate_model(
     curr_step = kwargs["curr_step"] + 1 if "curr_step" in kwargs else 0
     training_steps = max_steps if training_steps is None else min(training_steps, max_steps)
 
+    training_time = 0
+    validation_time = 0
+
     # training loop
     for iter in tqdm(range(curr_step, training_steps)):
 
@@ -169,6 +172,8 @@ def train_and_evaluate_model(
         split = "train"
         xb, yb = dataloader(split, batch_size)
     
+        training_time_start = time.time()
+
         # evaluate loss on the batch
         logits, loss = model(xb, yb)
         optimizer.zero_grad(set_to_none=True)
@@ -181,13 +186,19 @@ def train_and_evaluate_model(
         lrs.append(scheduler.get_last_lr()[0])
         scheduler.step()
 
+        training_time += time.time() - training_time_start
+
         train_losses.append(loss.item())
         valid_losses.append(valid_losses[-1])
 
         # evaluate the loss on train and val sets every `verbosity_len` steps
         if (iter + 1) % verbosity_len == 0 or iter == training_steps - 1:
             model.eval()    
+            
+            validation_time_start = time.time()
             valid_loss = evaluate_model(model, dataloader)
+            validation_time += time.time() - validation_time_start
+            
             valid_losses[-1] = valid_loss
             _train = np.mean(train_losses[-1])
             _valid = np.mean(valid_losses[-1])
@@ -229,6 +240,8 @@ def train_and_evaluate_model(
         "train": train_losses,
         "valid": valid_losses,
         "lrs": lrs,
+        "training_time": training_time,
+        "validation_time": validation_time
     }
     return _losses
 
