@@ -62,7 +62,7 @@ class CharLM(nn.Module):
     def forward(self, idx, targets=None):
         # B: batch_size, T: block_size, C: embedding_size
         B, T = idx.shape
-
+        
         # idx and targets are both (B,T) tensor of integers
         tok_emb = self.token_embedding_table(idx)  # (B,T,C)
         # fixing positional inputs and learning an embedding over it

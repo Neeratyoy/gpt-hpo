@@ -98,6 +98,7 @@ def run(setting, verbose: str=True):
 
     except RuntimeError as e:
         if 'CUDA out of memory' in str(e):
+            # bypasses the error and returns a maximal loss and minimal runtime cost
             print('CUDA out of memory error:', e)
             result = dict(
                 loss=float("inf"),  # maximal loss 

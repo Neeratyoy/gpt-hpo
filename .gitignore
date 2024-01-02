@@ -1,3 +1,6 @@
+# project related
+data/
+
 # dev related
 .idea/
 .vscode
@@ -14,3 +17,8 @@ __pycache__/
 # miscellaneous
 *.png
 debug/
+*.bin
+*/*.bin
+*/*/*.bin
+*/*/*/*.bin
+*/*/*/*/*.bin

@@ -1,4 +1,4 @@
-activation: gelu
+activation: relu
 batch_size: 64
 block_size: 256
 embed_size: 384

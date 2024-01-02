@@ -196,7 +196,7 @@ def train_and_evaluate_model(
             model.eval()    
             
             validation_time_start = time.time()
-            valid_loss = evaluate_model(model, dataloader)
+            valid_loss = evaluate_model(model, dataloader, batch_size)
             validation_time += time.time() - validation_time_start
             
             valid_losses[-1] = valid_loss
@@ -249,11 +249,12 @@ def train_and_evaluate_model(
 def evaluate_model(
     model: nn.Module,
     dataloader: Callable,
+    batch_size: int = 64,
 ) -> Dict[str, List[float]]:
     """ Evaluates the model on the validation set. 
     """
     model.eval()
-    X, Y = dataloader(split="valid", batch_size=None)
+    X, Y = dataloader(split="valid", batch_size=batch_size)
     loss = estimate_loss(model, X, Y)
     model.train()
 
